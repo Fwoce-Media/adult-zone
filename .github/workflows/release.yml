@@ -1,0 +1,96 @@
+name: Release
+
+# Push a version tag and this builds both downloads and publishes them:
+#
+#   git tag v2.3.0
+#   git push origin v2.3.0
+#
+# Run it from the Actions tab instead if you just want to check it builds.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = if ($tag -match '^v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '0.0.0' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $version"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          dotnet publish src/AdultZone/AdultZone.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishReadyToRun=true `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -o publish
+
+      - name: Package the portable download
+        shell: pwsh
+        run: |
+          # This marker is what tells the app to keep everything in its own
+          # folder, so the portable copy leaves nothing on the machine.
+          "Adult Zone portable. Delete this file to store your library in your user folder instead." |
+            Set-Content publish/portable.txt
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Compress-Archive -Path publish/* `
+            -DestinationPath "artifacts/AdultZone-${{ steps.version.outputs.version }}-portable.zip"
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          # The installed copy is not portable; that marker belongs only in the zip.
+          Remove-Item publish/portable.txt
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc /DAppVersion=${{ steps.version.outputs.version }} `
+                  /DSourceDir=..\publish `
+                  /O"$PWD\artifacts" `
+                  installer\AdultZone.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdultZone-${{ steps.version.outputs.version }}
+          path: artifacts/*
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true            # look it over, then press Publish
+          name: Adult Zone ${{ steps.version.outputs.version }}
+          files: artifacts/*
+          body: |
+            ## Downloads
+
+            | | |
+            |---|---|
+            | **AdultZone-${{ steps.version.outputs.version }}-Setup.exe** | Installer. Adds a Start menu entry and an uninstaller. |
+            | **AdultZone-${{ steps.version.outputs.version }}-portable.zip** | Unzip and run. Keeps everything in its own folder. |
+
+            Windows 10 or 11, 64-bit. Nothing else to install.
+
+            **ffmpeg** is needed for thumbnails and preview clips. Install it
+            and the app finds it, or drop `ffmpeg.exe` and `ffprobe.exe` into an
+            `ffmpeg` folder beside the program.

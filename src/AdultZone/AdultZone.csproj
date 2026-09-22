@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- A window rather than a console, but still an ASP.NET Core host inside. -->
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AdultZone</AssemblyName>
+    <RootNamespace>AdultZone</RootNamespace>
+    <ApplicationIcon>assets\adult-zone.ico</ApplicationIcon>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyVersion>2.3.0.0</AssemblyVersion>
+    <FileVersion>2.3.0.0</FileVersion>
+    <Version>2.3.0</Version>
+    <Company>Fwoce Media</Company>
+    <Product>Adult Zone</Product>
+    <Authors>Fwoce Media</Authors>
+    <Description>A private media library for videos you already own.</Description>
+    <Copyright>Copyright © 2026 Fwoce Media</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The interface, carried over unchanged from the Python build. -->
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="assets\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Built into the program so the window icon can never go missing. -->
+    <EmbeddedResource Include="assets\adult-zone.ico" LogicalName="AdultZone.window.ico" />
+  </ItemGroup>
+
+</Project>

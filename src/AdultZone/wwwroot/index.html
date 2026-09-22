@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adult Zone</title>
+<link rel="icon" href="/static/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="256x256" href="/static/icon-256.png">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/style.css?v=__V__">
+</head>
+<body class="__LOCK__">
+
+<header class="topbar" id="topbar">
+  <button class="icon-btn back-btn" id="btn-back" title="Back" aria-label="Go back" hidden>
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <a class="wordmark" href="#/home">Adult<span>Zone</span></a>
+
+  <nav class="tabs" id="tabs">
+    <a href="#/home"    data-tab="home">Home</a>
+    <a href="#/videos"  data-tab="videos">Videos</a>
+    <a href="#/studios" data-tab="studios">Studios</a>
+    <a href="#/stars"   data-tab="stars">Pornstars</a>
+  </nav>
+
+  <div class="topbar-right">
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="search-input" type="search" placeholder="Search titles, stars, studios, tags" autocomplete="off">
+    </div>
+    <button class="icon-btn" id="btn-quick-scan" title="Scan for new videos" aria-label="Scan for new videos">
+      <svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.6 4.4v4.4h-4.4"/></svg>
+    </button>
+    <a class="icon-btn" href="#/settings" title="Library settings" aria-label="Library settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4M6.2 6.2 4.5 4.5M19.5 19.5l-1.7-1.7M17.8 6.2l1.7-1.7M4.5 19.5l1.7-1.7"/></svg>
+    </a>
+    <button class="icon-btn icon-quit" id="btn-quit" title="Close Adult Zone" aria-label="Close Adult Zone">
+      <svg viewBox="0 0 24 24"><path d="M12 3.4v8.2"/><path d="M17.4 6.2a7.6 7.6 0 1 1-10.8 0"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="view" class="view"></main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
+<div id="lock" class="lock" hidden>
+  <div class="lock-card" id="lock-card">
+    <div class="lock-mark">Adult<span>Zone</span></div>
+    <p class="lock-hint" id="lock-hint">Enter your PIN</p>
+
+    <div class="pin-dots" id="pin-dots"></div>
+
+    <div class="keypad" id="keypad">
+      <button class="key" data-key="1">1</button>
+      <button class="key" data-key="2">2</button>
+      <button class="key" data-key="3">3</button>
+      <button class="key" data-key="4">4</button>
+      <button class="key" data-key="5">5</button>
+      <button class="key" data-key="6">6</button>
+      <button class="key" data-key="7">7</button>
+      <button class="key" data-key="8">8</button>
+      <button class="key" data-key="9">9</button>
+      <button class="key key-soft" data-key="back" aria-label="Delete">
+        <svg viewBox="0 0 24 24"><path d="M9 5h11v14H9L3 12z"/><path d="M13 10l4 4M17 10l-4 4"/></svg>
+      </button>
+      <button class="key" data-key="0">0</button>
+      <button class="key key-go" data-key="enter" aria-label="Unlock">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l5 5 9-11"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="warm" class="warm" hidden>
+  <div class="warm-card">
+    <div class="lock-mark">Adult<span>Zone</span></div>
+    <p class="warm-hint" id="warm-hint">Preparing your library…</p>
+    <div class="warm-bar"><i id="warm-fill"></i></div>
+    <button class="ghost-btn" id="warm-skip">Skip</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/js/app.js?v=__V__"></script>
+</body>
+</html>

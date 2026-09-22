@@ -1,0 +1,318 @@
+[
+{
+"code": "al",
+"name": "Albania"
+},
+{
+"code": "ar",
+"name": "Argentina"
+},
+{
+"code": "am",
+"name": "Armenia"
+},
+{
+"code": "au",
+"name": "Australia"
+},
+{
+"code": "at",
+"name": "Austria"
+},
+{
+"code": "by",
+"name": "Belarus"
+},
+{
+"code": "be",
+"name": "Belgium"
+},
+{
+"code": "bo",
+"name": "Bolivia"
+},
+{
+"code": "ba",
+"name": "Bosnia and Herzegovina"
+},
+{
+"code": "br",
+"name": "Brazil"
+},
+{
+"code": "bg",
+"name": "Bulgaria"
+},
+{
+"code": "ca",
+"name": "Canada"
+},
+{
+"code": "cl",
+"name": "Chile"
+},
+{
+"code": "cn",
+"name": "China"
+},
+{
+"code": "co",
+"name": "Colombia"
+},
+{
+"code": "cr",
+"name": "Costa Rica"
+},
+{
+"code": "hr",
+"name": "Croatia"
+},
+{
+"code": "cu",
+"name": "Cuba"
+},
+{
+"code": "cz",
+"name": "Czechia"
+},
+{
+"code": "dk",
+"name": "Denmark"
+},
+{
+"code": "do",
+"name": "Dominican Republic"
+},
+{
+"code": "ec",
+"name": "Ecuador"
+},
+{
+"code": "eg",
+"name": "Egypt"
+},
+{
+"code": "ee",
+"name": "Estonia"
+},
+{
+"code": "fi",
+"name": "Finland"
+},
+{
+"code": "fr",
+"name": "France"
+},
+{
+"code": "ge",
+"name": "Georgia"
+},
+{
+"code": "de",
+"name": "Germany"
+},
+{
+"code": "gr",
+"name": "Greece"
+},
+{
+"code": "hu",
+"name": "Hungary"
+},
+{
+"code": "is",
+"name": "Iceland"
+},
+{
+"code": "in",
+"name": "India"
+},
+{
+"code": "id",
+"name": "Indonesia"
+},
+{
+"code": "iq",
+"name": "Iraq"
+},
+{
+"code": "ie",
+"name": "Ireland"
+},
+{
+"code": "il",
+"name": "Israel"
+},
+{
+"code": "it",
+"name": "Italy"
+},
+{
+"code": "jm",
+"name": "Jamaica"
+},
+{
+"code": "jp",
+"name": "Japan"
+},
+{
+"code": "ke",
+"name": "Kenya"
+},
+{
+"code": "lv",
+"name": "Latvia"
+},
+{
+"code": "lt",
+"name": "Lithuania"
+},
+{
+"code": "mx",
+"name": "Mexico"
+},
+{
+"code": "md",
+"name": "Moldova"
+},
+{
+"code": "ma",
+"name": "Morocco"
+},
+{
+"code": "nl",
+"name": "Netherlands"
+},
+{
+"code": "nz",
+"name": "New Zealand"
+},
+{
+"code": "ng",
+"name": "Nigeria"
+},
+{
+"code": "mk",
+"name": "North Macedonia"
+},
+{
+"code": "no",
+"name": "Norway"
+},
+{
+"code": "pk",
+"name": "Pakistan"
+},
+{
+"code": "pa",
+"name": "Panama"
+},
+{
+"code": "py",
+"name": "Paraguay"
+},
+{
+"code": "pe",
+"name": "Peru"
+},
+{
+"code": "ph",
+"name": "Philippines"
+},
+{
+"code": "pl",
+"name": "Poland"
+},
+{
+"code": "pt",
+"name": "Portugal"
+},
+{
+"code": "pr",
+"name": "Puerto Rico"
+},
+{
+"code": "ro",
+"name": "Romania"
+},
+{
+"code": "ru",
+"name": "Russia"
+},
+{
+"code": "rs",
+"name": "Serbia"
+},
+{
+"code": "sk",
+"name": "Slovakia"
+},
+{
+"code": "si",
+"name": "Slovenia"
+},
+{
+"code": "za",
+"name": "South Africa"
+},
+{
+"code": "kr",
+"name": "South Korea"
+},
+{
+"code": "es",
+"name": "Spain"
+},
+{
+"code": "se",
+"name": "Sweden"
+},
+{
+"code": "ch",
+"name": "Switzerland"
+},
+{
+"code": "tw",
+"name": "Taiwan"
+},
+{
+"code": "th",
+"name": "Thailand"
+},
+{
+"code": "tt",
+"name": "Trinidad and Tobago"
+},
+{
+"code": "tr",
+"name": "Turkey"
+},
+{
+"code": "ua",
+"name": "Ukraine"
+},
+{
+"code": "ae",
+"name": "United Arab Emirates"
+},
+{
+"code": "gb",
+"name": "United Kingdom"
+},
+{
+"code": "us",
+"name": "United States"
+},
+{
+"code": "uy",
+"name": "Uruguay"
+},
+{
+"code": "ve",
+"name": "Venezuela"
+},
+{
+"code": "vn",
+"name": "Vietnam"
+}
+]
