@@ -62,21 +62,10 @@ a scene.
 
 ## Supporting it
 
-If it is useful to you, you can support development on Patreon. The app is
-free, and stays free.
+If it is useful to you, you can support development on
+[Patreon](https://patreon.com/). The app is free, and stays free.
 
-## Building it yourself
-
-Needs Visual Studio 2022 with **.NET desktop development** and **ASP.NET and
-web development**, or just the .NET 8 SDK.
-
-```
-dotnet run --project src\AdultZone\AdultZone.csproj
-```
-
-Releases are built by GitHub Actions: push a tag such as `v2.3.0` and it
-produces both downloads and opens a draft release. See
-[DEVELOPING.md](DEVELOPING.md) for the details.
+Bug reports and ideas are welcome in [Issues](../../issues).
 
 ## Licence
 
