@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Adult Zone: the native Windows app. Open AdultZone.sln in Visual Studio
+       and press F5; NuGet fetches the video player the first time. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>AdultZone</AssemblyName>
+    <RootNamespace>AdultZone.Desktop</RootNamespace>
+    <StartupObject>AdultZone.Desktop.Program</StartupObject>
+    <ApplicationIcon>adultzone.ico</ApplicationIcon>
+    <Version>3.0.0</Version>
+    <Product>Adult Zone</Product>
+    <Company>Fwoce Media</Company>
+    <Authors>Fwoce Media</Authors>
+    <Description>A library for the videos you own.</Description>
+    <Copyright>Copyright © 2026 Fwoce Media</Copyright>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- Only the 64-bit VLC libraries are copied beside the app. -->
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="adultzone.ico" />
+    <Resource Include="flags\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdultZone.Core\AdultZone.Core.csproj" />
+  </ItemGroup>
+
+</Project>

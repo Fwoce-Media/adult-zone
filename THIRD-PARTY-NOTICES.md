@@ -1,20 +1,26 @@
-# Third-party components
+# Third-party notices
 
-Adult Zone uses the following. Their licences apply to those parts.
+Adult Zone is MIT licensed (see [LICENSE](LICENSE)). It includes or uses:
 
-| Component | Licence | Used for |
+| | Licence | Used for |
 |---|---|---|
-| [.NET 8](https://github.com/dotnet/runtime) | MIT | the runtime |
-| [Microsoft.Data.Sqlite](https://github.com/dotnet/efcore) | MIT | the library database |
-| [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | [Microsoft terms](https://developer.microsoft.com/microsoft-edge/webview2/) | drawing the interface |
-| [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) | [Six Labors Split Licence](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE) | resizing artwork |
+| [LibVLC](https://www.videolan.org/vlc/libvlc.html) | LGPL 2.1 or later | playback |
+| [LibVLCSharp](https://code.videolan.org/videolan/LibVLCSharp) | LGPL 2.1 or later | connecting the app to LibVLC |
 | [flag-icons](https://github.com/lipis/flag-icons) | MIT | nationality flags |
 
-**ImageSharp is worth reading about before you publish.** Version 3 is free to
-use in projects released under an OSI-approved open source licence — which this
-project is, under MIT. A closed-source commercial product would need a paid
-licence from Six Labors instead.
+LibVLC and LibVLCSharp are included unmodified, as separate libraries in the
+`libvlc` folder and `LibVLCSharp*.dll`. Their source is available from
+VideoLAN at the links above, and you may replace them with your own builds.
 
-**ffmpeg is not included.** The app looks for it on your machine and tells you
-if it is missing. Shipping ffmpeg binaries carries its own licence obligations,
-so it stays separate.
+[ffmpeg](https://ffmpeg.org/) is not included. When you install it, Adult
+Zone runs it to make thumbnails, previews and seek-bar frames.
+
+## Metadata sources
+
+Details are only fetched when you ask for them:
+
+- [Wikipedia](https://www.wikipedia.org/) — text under
+  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); dates of
+  birth from [Wikidata](https://www.wikidata.org/) (CC0).
+- [ThePornDB](https://theporndb.net/) — with your own API key.
+- Any page address you give — its own published metadata tags.

@@ -8,9 +8,9 @@ artifacts/
 .vs/
 *.user
 
-# never commit a library or any secrets
-Data/
-secrets.json
+# never commit a library (a portable copy's Data folder, only at the top level)
+/Data/
 *.db
 *.db-wal
 *.db-shm
+secrets.json
