@@ -34,6 +34,9 @@ public static class Names
         (new Regex(@"[(\[]?(20\d{2}|19\d{2})[)\]]?"), "year"),
     };
 
+    /// <summary>A release site's tag on the end of a name: "Free at WOW", "WOW.XXX".</summary>
+    public static readonly Regex Tail = new(@"(\s*-\s*)?\b(free\s+at\s+\S+|wow\.xxx|www\.\S+|\S+\.(com|xxx|net|org))\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
     static readonly Regex Junk = new(
         @"\b(1080p|720p|480p|2160p|4k|uhd|hdrip|webrip|web-dl|bluray|x264|x265|h264|h265" +
         @"|hevc|aac|mp4|xxx|hd|sd|hq|rq|sample|part\d+|cd\d+)\b", I);
@@ -89,6 +92,7 @@ public static class Names
     public static Parsed Parse(string path, string? root, bool folderAsStudio = true, bool twoPartActor = true)
     {
         var stem = Path.GetFileNameWithoutExtension(path);
+        for (var i = 0; i < 3 && Tail.IsMatch(stem); i++) stem = Tail.Replace(stem, "").TrimEnd(' ', '-', '.');
         var output = new Parsed();
         var work = stem;
 
@@ -145,11 +149,12 @@ public static class Names
         {
             // The studio is known, so what is left reads "cast - title".
             output.Studio = bracketStudio;
-            if (parts.Count >= 2)
+            if (parts.Count >= 2 && SplitActors.Split(parts[0]).Where(n => n.Length > 0).All(LooksLikeName))
             {
                 output.Actors = Cast(parts[0]);
                 output.Title = TitleCase(string.Join(" - ", parts.Skip(1)));
             }
+            else if (parts.Count >= 2) output.Title = TitleCase(string.Join(" - ", parts));
             else if (parts.Count == 1) output.Title = TitleCase(parts[0]);
         }
         else if (parts.Count >= 3)

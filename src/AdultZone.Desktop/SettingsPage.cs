@@ -279,7 +279,7 @@ public static class SettingsPage
         var skipDone = Option("Skip ones already scraped", true);
         var replace = Option("Replace cast and tags", true);
         Func<Task> begin = () => Task.CompletedTask;
-        var start = Ui.Button("Start", () => _ = begin(), Ui.Look.Ember, small: true);
+        var buttonsHost = new ContentControl { Focusable = false };
 
         void Build()
         {
@@ -305,7 +305,22 @@ public static class SettingsPage
                 fields.Children.Add(c);
             }
             replace.Visibility = kind == "video" ? Visibility.Visible : Visibility.Collapsed;
+            // A review left unfinished can be picked up again, or put aside for a new scrape.
+            var saved = Batch.SessionCount(kind);
+            var start = Ui.Button(saved > 0 ? "New scrape" : "Start", () => _ = begin(), saved > 0 ? Ui.Look.Ghost : Ui.Look.Ember, small: true);
             start.IsEnabled = provider.Length > 0;
+            var row = new WrapPanel();
+            if (saved > 0)
+            {
+                var resumeKind = kind;
+                row.Children.Add(Ui.Button($"Resume review ({saved})", () =>
+                {
+                    if (Batch.LoadSession(resumeKind) is not { } session) { win.Toast("Nothing left to review"); Build(); return; }
+                    BatchDialog.Start(win, session.Options, session.State);
+                }, Ui.Look.Ember, small: true).Margin(0, 0, 10, 0));
+            }
+            row.Children.Add(start);
+            buttonsHost.Content = row;
         }
         var what = Ui.Select(new[] { ("video", "Videos"), ("actor", "Pornstars") }, kind, k => { kind = k; Build(); }, 220);
         Build();
@@ -318,7 +333,11 @@ public static class SettingsPage
             var options = new BatchOptions(kind, provider, picked, autoMerge.IsChecked == true, skipDone.IsChecked == true, replace.IsChecked == true);
             var count = await Task.Run(() => Batch.Count(options.Kind, options.SkipDone));
             if (count == 0) { win.Toast("Nothing to scrape"); return; }
-            if (!Dialogs.Confirm(win, $"Scrape {Ui.Plural(count, kind == "actor" ? "profile" : "video", kind == "actor" ? "profiles" : "videos")}?", "Start")) return;
+            var saved = Batch.SessionCount(kind);
+            var question = $"Scrape {Ui.Plural(count, kind == "actor" ? "profile" : "video", kind == "actor" ? "profiles" : "videos")}?";
+            if (saved > 0) question += $" The {Ui.Plural(saved, "item", "items")} waiting for review will be set aside.";
+            if (!Dialogs.Confirm(win, question, "Start")) return;
+            Batch.ClearSession(kind);
             BatchDialog.Start(win, options);
         };
 
@@ -329,8 +348,7 @@ public static class SettingsPage
         switches.Children.Add(autoMerge);
         switches.Children.Add(skipDone);
         switches.Children.Add(replace);
-        start.HorizontalAlignment = HorizontalAlignment.Left;
-        return Ui.Panel("Batch scrape", top, Ui.Caps("Fields", 10.5, Theme.Faint, 0.13).Margin(0, 0, 0, 8), fields, switches, start);
+        return Ui.Panel("Batch scrape", top, Ui.Caps("Fields", 10.5, Theme.Faint, 0.13).Margin(0, 0, 0, 8), fields, switches, buttonsHost);
     }
 
     // ------------------------------------------------------------ screen lock

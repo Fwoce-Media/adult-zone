@@ -82,14 +82,14 @@ public static class Scrape
         catch (SourceError ex) { return (false, ex.Message); }
     }
 
-    public static List<Found> Search(string provider, string kind, string query)
+    public static List<Found> Search(string provider, string kind, string query, int limit = 8)
     {
         query = query.Trim();
         if (query.Length == 0) return new();
         return provider switch
         {
             "wikipedia" => Wikipedia(query, kind),
-            "tpdb" => Tpdb(query, kind),
+            "tpdb" => Tpdb(query, kind, limit),
             "url" => FromPage(query),
             _ => throw new SourceError("Unknown source"),
         };
@@ -284,6 +284,25 @@ public static class Scrape
         return (network, site);
     }
 
+    /// <summary>A scene picked from a long list, read in full for its artwork, description, cast and tags.</summary>
+    public static Found CompleteScene(Found f)
+    {
+        if (f.Source != "tpdb" || f.Id.Length == 0 || TpdbKey.Length == 0) return f;
+        if (f.Image.Length > 0 && f.Description.Length > 0 && f.Tags.Count > 0) return f;
+        try
+        {
+            var detail = Http.GetJson($"{TpdbBase}/scenes/{Uri.EscapeDataString(f.Id)}", TpdbHeaders());
+            var full = detail?["data"] ?? detail;
+            if (full == null) return f;
+            if (f.Image.Length == 0) f.Image = SceneImage(full);
+            if (f.Description.Length == 0) f.Description = (Str(full["description"]) is { Length: > 0 } d ? d : Str(full["bio"])).Trim();
+            if (f.Tags.Count == 0) f.Tags = Names(full["tags"]);
+            if (f.Performers.Count == 0) f.Performers = Names(full["performers"]);
+        }
+        catch (SourceError) { }
+        return f;
+    }
+
     static JsonNode Fill(JsonNode item)
     {
         // List results are often trimmed; the full record carries the artwork.
@@ -313,13 +332,60 @@ public static class Scrape
         return "";
     }
 
-    static List<Found> Tpdb(string query, string kind, int limit = 8)
+    /// <summary>
+    /// ThePornDB reading a whole "studio performer title" line the way it reads
+    /// a file name, which narrows far better than a plain title search.
+    /// </summary>
+    public static List<Found> TpdbParse(string text, string kind = "scene") =>
+        TpdbKey.Length == 0 || text.Trim().Length == 0 ? new() : Tpdb(text, kind, 8, "parse");
+
+    static readonly Dictionary<string, string> SiteIds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>ThePornDB's id for a studio or site by its name; blank when it has none by that exact name.</summary>
+    static string SiteId(string name)
+    {
+        lock (SiteIds)
+            if (SiteIds.TryGetValue(name, out var known)) return known;
+        var id = "";
+        var payload = Http.GetJson($"{TpdbBase}/sites?q={Q(name)}&per_page=10", TpdbHeaders());
+        foreach (var site in payload?["data"] as JsonArray ?? new JsonArray())
+        {
+            if (site == null) continue;
+            var names = new[] { Str(site["name"]), Str(site["short_name"]) };
+            if (names.Any(n => Batch.Norm(n) == Batch.Norm(name)))
+            {
+                id = site["id"]?.ToString() ?? "";
+                break;
+            }
+        }
+        lock (SiteIds) SiteIds[name] = id;
+        return id;
+    }
+
+    /// <summary>
+    /// Scenes from one studio or site only. Blank when ThePornDB has no site by
+    /// that name; results from anywhere else are dropped in case the filter is ignored.
+    /// </summary>
+    public static List<Found> TpdbSiteScenes(string site, string query, int limit = 25)
+    {
+        if (TpdbKey.Length == 0 || site.Trim().Length == 0) return new();
+        var id = SiteId(site.Trim());
+        if (id.Length == 0) return new();
+        var q = query.Trim().Length > 0 ? $"&q={Q(query)}" : "";
+        var hits = Tpdb("", "scene", limit, "", $"site_id={Uri.EscapeDataString(id)}{q}");
+        var want = Batch.Norm(site);
+        return hits.Where(h => Batch.Norm(h.Site) == want || Batch.Norm(h.Studio) == want).ToList();
+    }
+
+    static List<Found> Tpdb(string query, string kind, int limit = 8, string param = "q", string? raw = null)
     {
         if (TpdbKey.Length == 0) throw new SourceError("Add your ThePornDB API key in Settings first.");
         var path = kind switch { "performer" => "performers", "studio" => "sites", "movie" => "movies", _ => "scenes" };
-        var payload = Http.GetJson($"{TpdbBase}/{path}?q={Q(query)}&per_page={limit}", TpdbHeaders());
+        var filter = raw ?? $"{param}={Q(query)}";
+        var payload = Http.GetJson($"{TpdbBase}/{path}?{filter}&per_page={limit}", TpdbHeaders());
         var items = (payload?["data"] as JsonArray ?? new JsonArray()).Where(n => n != null).Take(limit).Select(n => n!).ToList();
-        if (kind == "scene") items = items.Select(Fill).ToList();
+        // Filling each list entry costs a request apiece: only for the short lists a person reads.
+        if (kind == "scene" && limit <= 8) items = items.Select(Fill).ToList();
         var output = new List<Found>();
         foreach (var item in items)
         {

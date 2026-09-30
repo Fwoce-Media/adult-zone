@@ -18,14 +18,18 @@ public static class BatchDialog
 {
     static bool _busy;
 
-    public static void Start(MainWindow win, BatchOptions o)
+    /// <summary>Runs a batch scrape, or with a saved review, opens that review where it was left.</summary>
+    public static void Start(MainWindow win, BatchOptions o, BatchState? resumed = null)
     {
         if (_busy) { win.Toast("A batch scrape is already running"); return; }
         _busy = true;
         var w = Dialogs.Create(win, "Batch scrape", 780, 760);
-        var state = new BatchState();
+        var state = resumed ?? new BatchState();
         var stop = new CancellationTokenSource();
-        var finished = false;
+        var finished = resumed != null;
+        var index = 0;
+        ScrollViewer scroll = null!;
+        void Save() => Batch.SaveSession(o, state);
 
         (Border Tile, TextBlock Number) Stat(string label, Brush colour)
         {
@@ -96,6 +100,8 @@ public static class BatchDialog
                 _ => new(),
             });
             if (mine != selectVersion) return;
+            if (item is BatchChoice pick && o.Kind == "video" && pick.Options.Any(h => h.Image.Length == 0 && h.Source == "tpdb"))
+                _ = FillArt(pick);
             var heading = item switch
             {
                 BatchChoice c => c.Label,
@@ -103,6 +109,19 @@ public static class BatchDialog
                 _ => "",
             };
             player.Load(items, items.Count > 1 ? $"{heading} · {items.Count} videos" : heading);
+        }
+
+        // Long result lists come without pictures; a choice's are fetched when it is looked at.
+        async Task FillArt(BatchChoice c)
+        {
+            var filled = await Task.Run(() => c.Options.Select(h => h.Image.Length > 0 ? h : Scrape.CompleteScene(h.Copy())).ToList());
+            lock (state)
+            {
+                if (!state.Choices.Contains(c)) return;
+                c.Options = filled;
+            }
+            if (blocks.TryGetValue(c, out var block)) FillChoice(block, c);
+            Save();
         }
 
         void Paint()
@@ -119,29 +138,44 @@ public static class BatchDialog
                 : state.Total == 0 ? "Starting…" : $"{state.Done} of {state.Total} · {state.Current}";
         }
 
+        // One item at a time: the player shows one video, and a short page moves on at once.
         void ShowReview()
         {
             body.Children.Clear();
             blocks.Clear();
-            List<BatchChoice> choices;
-            List<BatchMerge> merges;
+            List<object> queue;
             List<string> errors;
             lock (state)
             {
-                choices = state.Choices.ToList();
-                merges = state.Merges.ToList();
+                queue = state.Choices.Cast<object>().Concat(state.Merges).ToList();
                 errors = state.Errors.ToList();
             }
+            if (selected != null && queue.IndexOf(selected) is var at and >= 0) index = at;
+            index = queue.Count == 0 ? 0 : Math.Clamp(index, 0, queue.Count - 1);
 
-            if (choices.Count > 0)
+            if (queue.Count > 0)
             {
-                body.Children.Add(Heading($"Pick the match ({choices.Count})"));
-                foreach (var c in choices) body.Children.Add(ChoiceBlock(c));
-            }
-            if (merges.Count > 0)
-            {
-                body.Children.Add(Heading($"Same performer? ({merges.Count})"));
-                foreach (var m in merges) body.Children.Add(MergeRow(m));
+                var item = queue[index];
+                var nav = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 10, 0, 12) };
+                Button Arrow(string glyph, int step)
+                {
+                    var b = Ui.Button(glyph, () => { index += step; selected = null; ShowReview(); }, small: true);
+                    b.IsEnabled = index + step >= 0 && index + step < queue.Count;
+                    return b;
+                }
+                var position = Ui.Text($"{index + 1} / {queue.Count}", 13, Theme.Muted, margin: new Thickness(12, 0, 12, 0));
+                position.VerticalAlignment = VerticalAlignment.Center;
+                position.FontFamily = Theme.Mono;
+                var arrows = Ui.Row(Arrow("‹", -1), position, Arrow("›", 1));
+                arrows.VerticalAlignment = VerticalAlignment.Center;
+                DockPanel.SetDock(arrows, Dock.Right);
+                nav.Children.Add(arrows);
+                var heading = Heading(item is BatchChoice ? "Pick the match" : "Same performer?");
+                heading.Margin = new Thickness(0);
+                heading.VerticalAlignment = VerticalAlignment.Center;
+                nav.Children.Add(heading);
+                body.Children.Add(nav);
+                body.Children.Add(item is BatchChoice c ? ChoiceBlock(c) : MergeRow((BatchMerge)item));
             }
             if (errors.Count > 0)
             {
@@ -161,6 +195,7 @@ public static class BatchDialog
                     current.Text = "Retrying…";
                     await Task.Run(() => Batch.Run(o, state, CancellationToken.None, Tick, ids));
                     Images.Clear();
+                    Save();
                     ShowReview();
                     win.Refresh(keepScroll: true);
                 }, small: true);
@@ -172,13 +207,13 @@ public static class BatchDialog
                 foreach (var e in errors)
                     body.Children.Add(Ui.Text(e, 12.5, Theme.Muted, wrap: true, margin: new Thickness(0, 0, 0, 6)));
             }
-            var watchable = choices.Count + merges.Count > 0;
+            var watchable = queue.Count > 0;
             player.Visibility = watchable ? Visibility.Visible : Visibility.Collapsed;
             playerColumn.Width = watchable ? new GridLength(0.9, GridUnitType.Star) : new GridLength(0);
             if (!watchable) player.Close();
-            else if (selected == null || !blocks.ContainsKey(selected))
-                Select(choices.Count > 0 ? choices[0] : merges[0]);
-            else if (blocks.TryGetValue(selected, out var still)) still.BorderBrush = Theme.Ember;
+            else if (!ReferenceEquals(selected, queue[index])) Select(queue[index]);
+            else if (blocks.TryGetValue(selected!, out var still)) still.BorderBrush = Theme.Ember;
+            scroll.ScrollToTop();
             Paint();
         }
 
@@ -192,12 +227,22 @@ public static class BatchDialog
                 Background = Theme.Panel2, BorderBrush = Theme.LineSoft, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12),
             };
+            FillChoice(block, c);
+            blocks[c] = block;
+            block.Cursor = Cursors.Hand;
+            block.PreviewMouseLeftButtonDown += (_, _) => { if (!ReferenceEquals(selected, c)) Select(c); };
+            return block;
+        }
+
+        void FillChoice(Border block, BatchChoice c)
+        {
             var stack = new StackPanel();
             var head = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 10) };
             var skip = Ui.Link("Skip", () =>
             {
                 lock (state) state.Choices.Remove(c);
                 state.Skipped++;
+                Save();
                 ShowReview();
             }, 12.5);
             DockPanel.SetDock(skip, Dock.Right);
@@ -219,6 +264,7 @@ public static class BatchDialog
                         lock (state) state.Choices.Remove(c);
                         state.Succeeded++;
                         Images.Clear();
+                        Save();
                         ShowReview();
                     }
                     catch (Exception ex)
@@ -230,10 +276,6 @@ public static class BatchDialog
                 }));
             stack.Children.Add(status);
             block.Child = stack;
-            blocks[c] = block;
-            block.Cursor = Cursors.Hand;
-            block.PreviewMouseLeftButtonDown += (_, _) => { if (!ReferenceEquals(selected, c)) Select(c); };
-            return block;
         }
 
         FrameworkElement Option(Found hit, Action use)
@@ -307,11 +349,13 @@ public static class BatchDialog
                     state.Merges.RemoveAll(x => x.FromId == x.IntoId);
                 }
                 Images.Clear();
+                Save();
                 ShowReview();
             }, Ui.Look.Ember, small: true);
             var apart = Ui.Button("Keep apart", () =>
             {
                 lock (state) state.Merges.Remove(m);
+                Save();
                 ShowReview();
             }, small: true);
             var buttons = Ui.Row(apart, merge.Margin(8, 0, 0, 0));
@@ -338,7 +382,7 @@ public static class BatchDialog
         header.Children.Add(stats);
         header.Children.Add(current);
         header.Children.Add(bar);
-        var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false, Padding = new Thickness(0, 0, 8, 20) };
+        scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false, Padding = new Thickness(0, 0, 8, 20) };
         Ui.ChainWheel(scroll);
         var split = new Grid { Margin = new Thickness(24, 0, 16, 0) };
         split.ColumnDefinitions.Add(playerColumn);
@@ -364,14 +408,31 @@ public static class BatchDialog
             w.Dispatcher.BeginInvoke(Paint);
         }
 
-        w.Closing += (_, _) => { if (!finished) stop.Cancel(); player.Close(); };
+        w.PreviewKeyDown += (_, e) =>
+        {
+            if (!finished || e.Key is not (Key.Left or Key.Right)) return;
+            int count;
+            lock (state) count = state.Choices.Count + state.Merges.Count;
+            var next = index + (e.Key == Key.Right ? 1 : -1);
+            if (next < 0 || next >= count) return;
+            index = next;
+            selected = null;
+            ShowReview();
+            e.Handled = true;
+        };
+        w.Closing += (_, _) => { if (!finished) stop.Cancel(); player.Close(); if (finished) Save(); };
         w.Closed += (_, _) => win.Refresh(keepScroll: true);
         w.Loaded += async (_, _) =>
         {
             Paint();
-            try { await Task.Run(() => Batch.Run(o, state, stop.Token, Tick)); }
-            finally { _busy = false; }
-            finished = true;
+            if (resumed == null)
+            {
+                try { await Task.Run(() => Batch.Run(o, state, stop.Token, Tick)); }
+                finally { _busy = false; }
+                finished = true;
+                Save();
+            }
+            else _busy = false;
             stopButton.Visibility = Visibility.Collapsed;
             closeButton.Visibility = Visibility.Visible;
             Images.Clear();
