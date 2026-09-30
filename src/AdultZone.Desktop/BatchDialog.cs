@@ -28,6 +28,7 @@ public static class BatchDialog
         var stop = new CancellationTokenSource();
         var finished = resumed != null;
         var index = 0;
+        var typed = new Dictionary<BatchChoice, string[]>();
         ScrollViewer scroll = null!;
         void Save() => Batch.SaveSession(o, state);
 
@@ -252,6 +253,7 @@ public static class BatchDialog
             head.Children.Add(title);
             stack.Children.Add(head);
             var status = Ui.Text("", 12.5, Theme.Muted, wrap: true);
+            stack.Children.Add(SearchRow(c, block, status));
             foreach (var hit in c.Options)
                 stack.Children.Add(Option(hit, async () =>
                 {
@@ -276,6 +278,76 @@ public static class BatchDialog
                 }));
             stack.Children.Add(status);
             block.Child = stack;
+        }
+
+        // Studio, performers and title to search again by hand (a name, for a performer).
+        FrameworkElement SearchRow(BatchChoice c, Border block, TextBlock status)
+        {
+            var boxes = new List<TextBox>();
+            string studio = "", cast = "", title = c.Label;
+            if (typed.TryGetValue(c, out var kept))
+            {
+                (studio, cast, title) = (kept[0], kept[1], kept[2]);
+            }
+            else if (o.Kind != "actor" && Catalog.Video(c.Id) is { } v)
+            {
+                studio = v.Str("subsite").Length > 0 ? v.Str("subsite") : v.Str("studio_name");
+                cast = string.Join(", ", Catalog.Cast(v).Select(a => a.Str("name")));
+                title = v.Str("title");
+            }
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            var fields = o.Kind == "actor"
+                ? new[] { ("Name", title, 1.0) }
+                : new[] { ("Studio", studio, 1.0), ("Performers", cast, 1.4), ("Title", title, 1.8) };
+            foreach (var (label, value, weight) in fields)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(weight, GridUnitType.Star) });
+                var box = new TextBox { Text = value };
+                boxes.Add(box);
+                var field = Ui.Field(label, box);
+                field.Margin = new Thickness(0, 0, 8, 0);
+                Grid.SetColumn(field, grid.ColumnDefinitions.Count - 1);
+                grid.Children.Add(field);
+            }
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Button go = null!;
+            async void Run()
+            {
+                go.IsEnabled = false;
+                status.Foreground = Theme.Muted;
+                status.Text = "Looking…";
+                try
+                {
+                    var values = boxes.Select(b => b.Text.Trim()).ToArray();
+                    typed[c] = o.Kind == "actor" ? new[] { "", "", values[0] } : values;
+                    var found = await Task.Run(() => o.Kind == "actor"
+                        ? Batch.SearchAgain(o, c.Id, "", "", values[0])
+                        : Batch.SearchAgain(o, c.Id, values[0], values[1], values[2]));
+                    if (found.Count == 0)
+                    {
+                        status.Text = "Nothing found";
+                        go.IsEnabled = true;
+                        return;
+                    }
+                    lock (state) c.Options = found;
+                    FillChoice(block, c);
+                    Save();
+                    if (o.Kind == "video") _ = FillArt(c);
+                }
+                catch (Exception ex)
+                {
+                    status.Foreground = Theme.Warn;
+                    status.Text = ex.Message;
+                    go.IsEnabled = true;
+                }
+            }
+            go = Ui.Button("Search", Run, Ui.Look.Ember, small: true);
+            go.VerticalAlignment = VerticalAlignment.Bottom;
+            Grid.SetColumn(go, grid.ColumnDefinitions.Count - 1);
+            grid.Children.Add(go);
+            foreach (var b in boxes)
+                b.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Run(); e.Handled = true; } };
+            return grid;
         }
 
         FrameworkElement Option(Found hit, Action use)
@@ -410,7 +482,7 @@ public static class BatchDialog
 
         w.PreviewKeyDown += (_, e) =>
         {
-            if (!finished || e.Key is not (Key.Left or Key.Right)) return;
+            if (!finished || e.Key is not (Key.Left or Key.Right) || e.OriginalSource is TextBox) return;
             int count;
             lock (state) count = state.Choices.Count + state.Merges.Count;
             var next = index + (e.Key == Key.Right ? 1 : -1);

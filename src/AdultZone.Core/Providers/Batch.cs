@@ -197,6 +197,27 @@ public static class Batch
         return (null, Rank(t, all).Select(x => x.Hit).Take(10).ToList());
     }
 
+    /// <summary>
+    /// A search by hand for one item in the review: the studio, performers and
+    /// title as typed (a name for a performer). Everything found comes back, best first.
+    /// </summary>
+    public static List<Found> SearchAgain(BatchOptions o, long id, string studio, string performers, string title)
+    {
+        Target t;
+        if (o.Kind == "actor") t = new Target(id, title, title.Trim(), "", "", new());
+        else
+        {
+            var known = Targets("video", false).FirstOrDefault(x => x.Id == id);
+            var cast = performers.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            t = new Target(id, title, title.Trim(), studio.Trim(), known?.Date ?? "", cast, known?.Kind ?? "scene",
+                           "", "");
+        }
+        var (pick, all) = Find(o, t);
+        var ranked = o.Kind == "actor" ? all : Rank(t, all).Select(x => x.Hit).ToList();
+        if (pick != null) ranked = new[] { pick }.Concat(ranked.Where(h => !ReferenceEquals(h, pick))).ToList();
+        return ranked.Take(12).ToList();
+    }
+
     static readonly System.Text.RegularExpressions.Regex Noise = new(
         @"\b(free\s+at\s+\S+|wow\.xxx|www\.\S+|xxx|1080p|720p|480p|2160p|4k|uhd|hd|sd|mp4|x264|x265|hevc|web-?dl|webrip)\b|[\[\](){}]",
         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
