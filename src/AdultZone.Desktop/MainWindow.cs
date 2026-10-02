@@ -236,6 +236,7 @@ public sealed class MainWindow : Window
         }
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        right.Children.Add(StatusStrip.Build());
         right.Children.Add(BuildSearch());
         _scan.Margin = new Thickness(10, 0, 0, 0);
         right.Children.Add(_scan);

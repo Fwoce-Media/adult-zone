@@ -236,6 +236,9 @@ public static class Batch
         "a", "an", "and", "the", "of", "in", "on", "at", "with", "for", "to", "her", "his", "gets", "sc", "scene", "part", "free",
     };
 
+    /// <summary>Words that mark an extra: behind the scenes, a trailer, an interview.</summary>
+    static readonly HashSet<string> Extras = new() { "bts", "trailer", "teaser", "preview", "interview", "bloopers", "photoshoot" };
+
     /// <summary>The words that say something, lower case, accents dropped.</summary>
     static List<string> Words(string text) =>
         System.Text.RegularExpressions.Regex.Split(text, @"[^\p{L}\p{N}]+")
@@ -306,6 +309,14 @@ public static class Batch
             if (overlap >= 0.8) score += 3;
             else if (overlap >= 0.5) score += 2;
             else if (overlap >= 0.3 && shared >= 2) score += 1;
+            // The same words and nothing more: "A And B" is "A & B", and is not "A & B BTS".
+            var studio = Words(t.Studio).Concat(Words(t.Site)).ToHashSet();
+            var titleOnly = Words(Clean(t.Title)).Where(w => !studio.Contains(w)).ToHashSet();
+            var theirSet = theirs.Where(w => !studio.Contains(w)).ToHashSet();
+            if (theirSet.Count > 0 && (theirSet.SetEquals(titleOnly) || theirSet.SetEquals(ours))) score += 2;
+            // An extra of the scene, not the scene, unless ours is one too.
+            if (theirs.Any(w => Extras.Contains(w) && !ours.Contains(w)) || (h.Name.Contains("behind the scenes", StringComparison.OrdinalIgnoreCase) && !ours.Contains("behind")))
+                score -= 3;
         }
 
         if (h.Performers.Count > 0)
