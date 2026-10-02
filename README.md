@@ -53,11 +53,6 @@ Adult Zone is free. If it is useful to you:
 [Ko-fi](https://ko-fi.com/fwocemedia) ·
 [Buy Me a Coffee](https://buymeacoffee.com/Fwoce_Media)
 
-## Building it yourself
-
-Visual Studio 2022 with **.NET desktop development**: open `AdultZone.sln`
-and press F5. See [DEVELOPING.md](DEVELOPING.md).
-
 ## Licence
 
 MIT — see [LICENSE](LICENSE). Third-party components are listed in
