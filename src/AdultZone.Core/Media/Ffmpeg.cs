@@ -26,6 +26,8 @@ public static class Ffmpeg
                      Path.Combine(here, exe),
                      Path.Combine(here, "ffmpeg", exe),
                      Path.Combine(here, "ffmpeg", "bin", exe),
+                     // The copy the app fetched for itself.
+                     Path.Combine(Config.AppHome, "ffmpeg", exe),
                  })
             if (File.Exists(candidate)) return candidate;
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";

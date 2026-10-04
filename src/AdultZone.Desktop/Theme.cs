@@ -475,12 +475,28 @@ public static class Theme
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="MenuItem">
-          <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="12,8,20,8" MinWidth="170">
-            <ContentPresenter ContentSource="Header" RecognizesAccessKey="False"/>
-          </Border>
+          <Grid>
+            <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="12,8,12,8" MinWidth="170">
+              <DockPanel>
+                <TextBlock x:Name="arrow" DockPanel.Dock="Right" Text="&#x203A;" FontSize="16" Margin="22,-4,0,-2" Foreground="#9A98A6" Visibility="Collapsed"/>
+                <ContentPresenter ContentSource="Header" RecognizesAccessKey="False" Margin="0,0,8,0"/>
+              </DockPanel>
+            </Border>
+            <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="6" VerticalOffset="-6" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade"
+                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+              <Border Background="#101016" BorderBrush="#2A2A35" BorderThickness="1" CornerRadius="9" Padding="5">
+                <ScrollViewer MaxHeight="430" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
               <Setter TargetName="bd" Property="Background" Value="#17FFFFFF"/>
+            </Trigger>
+            <Trigger Property="HasItems" Value="True">
+              <Setter TargetName="arrow" Property="Visibility" Value="Visible"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

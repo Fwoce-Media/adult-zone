@@ -10,7 +10,7 @@
 #define AppPublisher "Fwoce Media"
 #define AppExe       "AdultZone.exe"
 #ifndef AppVersion
-  #define AppVersion "3.2.1"
+  #define AppVersion "3.5.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\publish"

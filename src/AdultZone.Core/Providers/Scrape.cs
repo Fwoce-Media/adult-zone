@@ -15,6 +15,12 @@ public sealed class Found
     public Dictionary<string, string> Facts = new();
     public List<string> Performers = new(), Tags = new(), Aliases = new();
 
+    /// <summary>Other addresses of the same picture, tried in order when Image cannot be fetched.</summary>
+    public List<string> Images = new();
+
+    /// <summary>Image first, then the others, no address twice.</summary>
+    public IEnumerable<string> ImageChoices() => new[] { Image }.Concat(Images).Where(u => u.Length > 0).Distinct();
+
     public Found Copy()
     {
         var f = (Found)MemberwiseClone();
@@ -22,6 +28,7 @@ public sealed class Found
         f.Performers = new List<string>(Performers);
         f.Tags = new List<string>(Tags);
         f.Aliases = new List<string>(Aliases);
+        f.Images = new List<string>(Images);
         return f;
     }
 }
@@ -232,11 +239,38 @@ public static class Scrape
     /// come first: the studio CDN in "image" often refuses requests from elsewhere.
     /// Background is landscape, which suits a 16:9 poster frame.
     /// </summary>
-    static string SceneImage(JsonNode item)
+    static string SceneImage(JsonNode item) => SceneImages(item).FirstOrDefault() ?? "";
+
+    /// <summary>
+    /// Every address a scene's picture is offered at, best first. ThePornDB's own
+    /// copies lead; the studio's address comes last, as studios take pictures
+    /// down and whole sites go away.
+    /// </summary>
+    public static List<string> SceneImages(JsonNode item, bool portrait = false)
     {
-        foreach (var candidate in new[] { item["background"], item["posters"], item["poster"], item["poster_image"], item["back_image"], item["image"], item["thumbnail"] })
-            if (PickImage(candidate) is { Length: > 0 } found) return Tidy(found);
-        return "";
+        var found = new List<string>();
+        void Collect(JsonNode? value)
+        {
+            switch (value)
+            {
+                case JsonValue v when v.TryGetValue<string>(out var s) && s.StartsWith("http", StringComparison.OrdinalIgnoreCase):
+                    if (!found.Contains(Tidy(s))) found.Add(Tidy(s));
+                    break;
+                case JsonObject o:
+                    foreach (var key in new[] { "large", "full", "medium", "url", "small", "thumb" }) Collect(o[key]);
+                    foreach (var (_, child) in o) Collect(child);
+                    break;
+                case JsonArray a:
+                    foreach (var entry in a) Collect(entry);
+                    break;
+            }
+        }
+        var order = portrait
+            ? new[] { "posters", "poster", "poster_image", "image", "thumbnail", "background", "back_image" }
+            : new[] { "background", "posters", "poster", "poster_image", "back_image", "image", "thumbnail" };
+        foreach (var key in order) Collect(item[key]);
+        bool Own(string url) => url.Contains("metadataapi.net", StringComparison.OrdinalIgnoreCase) || url.Contains("theporndb", StringComparison.OrdinalIgnoreCase);
+        return found.Where(Own).Concat(found.Where(u => !Own(u))).ToList();
     }
 
     /// <summary>A movie's front cover, portrait: the posters first, the landscape still last.</summary>
@@ -295,6 +329,8 @@ public static class Scrape
             var full = detail?["data"] ?? detail;
             if (full == null) return f;
             if (f.Image.Length == 0) f.Image = SceneImage(full);
+            foreach (var extra in SceneImages(full))
+                if (extra != f.Image && !f.Images.Contains(extra)) f.Images.Add(extra);
             if (f.Description.Length == 0) f.Description = (Str(full["description"]) is { Length: > 0 } d ? d : Str(full["bio"])).Trim();
             if (f.Tags.Count == 0) f.Tags = Names(full["tags"]);
             if (f.Performers.Count == 0) f.Performers = Names(full["performers"]);
@@ -398,6 +434,7 @@ public static class Scrape
                 Name = Str(item["name"]) is { Length: > 0 } n ? n : Str(item["title"]),
                 Description = (Str(item["bio"]) is { Length: > 0 } b ? b : Str(item["description"]) is { Length: > 0 } ds ? ds : Str(extras?["bio"])).Trim(),
                 Image = kind == "movie" ? MovieCover(item) : SceneImage(item),
+                Images = kind is "movie" or "scene" ? SceneImages(item, kind == "movie").Skip(kind == "movie" ? 0 : 1).ToList() : new(),
                 Banner = PickImage(item["background"]),
                 Date = date.Length >= 10 ? date[..10] : date,
                 Birthdate = Str(extras?["birthday"]) is { Length: >= 10 } bd ? bd[..10] : "",
@@ -470,6 +507,88 @@ public static class Scrape
         return f;
     }
 
+    /// <summary>
+    /// Every picture ThePornDB has of a performer, by name: their posters for a
+    /// photo; for a wide photo, stills from their scenes as well.
+    /// </summary>
+    public static List<string> TpdbPictures(string name, bool wide)
+    {
+        if (TpdbKey.Length == 0) throw new SourceError("Add your ThePornDB API key in Settings first.");
+        var payload = Http.GetJson($"{TpdbBase}/performers?q={Q(name)}&per_page=10", TpdbHeaders());
+        var want = Batch.Norm(name);
+        JsonNode? match = null;
+        foreach (var item in payload?["data"] as JsonArray ?? new JsonArray())
+        {
+            if (item == null) continue;
+            if (Batch.Norm(Str(item["name"])) == want || Names(item["aliases"]).Any(a => Batch.Norm(a) == want)) { match = item; break; }
+        }
+        if (match == null) throw new SourceError($"ThePornDB has nobody called {name}.");
+        var id = match["id"]?.ToString() ?? "";
+        var found = new List<string>();
+        void Add(string url) { if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase) && !found.Contains(Tidy(url))) found.Add(Tidy(url)); }
+        void Posters(JsonNode? node)
+        {
+            foreach (var key in new[] { "posters", "image", "poster", "face", "thumbnail" })
+            {
+                var value = node?[key];
+                if (value is JsonArray list)
+                    foreach (var entry in list) Add(entry is JsonObject o ? (Str(o["url"]) is { Length: > 0 } u ? u : PickImage(o)) : Str(entry));
+                else Add(PickImage(value));
+            }
+        }
+        JsonNode? full = null;
+        try
+        {
+            var detail = Http.GetJson($"{TpdbBase}/performers/{Uri.EscapeDataString(id)}", TpdbHeaders());
+            full = detail?["data"] ?? detail;
+        }
+        catch (SourceError) { }
+        if (wide)
+        {
+            try
+            {
+                var scenes = Http.GetJson($"{TpdbBase}/performers/{Uri.EscapeDataString(id)}/scenes?per_page=30", TpdbHeaders());
+                foreach (var item in scenes?["data"] as JsonArray ?? new JsonArray())
+                    if (item != null && SceneImage(item) is { Length: > 0 } still) Add(still);
+            }
+            catch (SourceError) { }
+        }
+        Posters(full);
+        Posters(match);
+        return found;
+    }
+
+    /// <summary>The address of a performer's Babepedia page.</summary>
+    public static string BabepediaPage(string name) =>
+        "https://www.babepedia.com/babe/" + Uri.EscapeDataString(string.Join("_", name.Split(' ', StringSplitOptions.RemoveEmptyEntries)));
+
+    /// <summary>Every picture on a performer's Babepedia page: the profile photos, then what people have uploaded.</summary>
+    public static List<string> BabepediaPictures(string name)
+    {
+        string html;
+        try { html = Http.GetText(BabepediaPage(name), new Dictionary<string, string> { ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }); }
+        catch (SourceError ex) when (ex.Status == 403) { throw new SourceError("Babepedia refused the request (403)."); }
+        catch (SourceError ex) when (ex.Status == 404) { throw new SourceError($"Babepedia has no page for {name}."); }
+        var found = BabepediaParse(html);
+        if (found.Count == 0) throw new SourceError($"Babepedia has no pictures for {name}.");
+        return found;
+    }
+
+    /// <summary>The pictures named in a Babepedia page: full size, each once, profile photos first.</summary>
+    public static List<string> BabepediaParse(string html)
+    {
+        var found = new List<string>();
+        foreach (var folder in new[] { "pics", "user-uploads" })
+            foreach (Match m in Regex.Matches(html, @"(?:https?://www\.babepedia\.com)?/" + folder + @"/([^""'<>?]+?\.(?:jpe?g|png|webp))", RegexOptions.IgnoreCase))
+            {
+                // The small copies are named like the full one with _thumb on the end.
+                var file = Regex.Replace(WebUtility.HtmlDecode(Uri.UnescapeDataString(m.Groups[1].Value)), @"_thumb\d*(?=\.[a-z]+$)", "", RegexOptions.IgnoreCase);
+                var url = $"https://www.babepedia.com/{folder}/{string.Join("/", file.Split('/').Select(Uri.EscapeDataString))}";
+                if (!found.Contains(url)) found.Add(url);
+            }
+        return found;
+    }
+
     /// <summary>A landscape still of the performer, taken from one of their scenes.</summary>
     static string WideShot(Found f)
     {
@@ -500,6 +619,15 @@ public static class Scrape
 
     // ----------------------------------------------------------------- apply
     /// <summary>A picture fetched and saved into the library's own folders.</summary>
+    /// <summary>A match's picture saved from the first of its addresses that still answers; null when none does.</summary>
+    public static string? SaveFirstImage(Found f, string folder, string stem, bool trim)
+    {
+        foreach (var url in f.ImageChoices())
+            try { return SaveImage(url, folder, stem, trim); }
+            catch (Exception ex) when (ex is SourceError or IOException or InvalidOperationException) { }
+        return null;
+    }
+
     public static string SaveImage(string url, string folder, string stem, bool trim)
     {
         var (data, ext) = Http.GetImage(url);
@@ -590,16 +718,25 @@ public static class Scrape
         var row = Db.QueryOne("SELECT path FROM videos WHERE id = ?", id);
         if (row == null) return applied;
         string? thumb = null;
+        var noPicture = false;
         var movie = Db.QueryOne("SELECT kind FROM videos WHERE id = ?", id)?.Str("kind") == "movie";
         if (pick.Contains("image") && f.Image.Length > 0)
         {
+            // A picture that cannot be fetched (its site gone, say) is left out; everything else still goes in.
             if (movie)
             {
-                Catalog.SetPictureColumn("videos", "cover", Config.ThumbDir, id,
-                    SaveImage(f.Image, Config.ThumbDir, Config.KeyFor(row.Str("path")) + "_cover", false));
-                applied.Add("cover");
+                if (SaveFirstImage(f, Config.ThumbDir, Config.KeyFor(row.Str("path")) + "_cover", false) is { } cover)
+                {
+                    Catalog.SetPictureColumn("videos", "cover", Config.ThumbDir, id, cover);
+                    applied.Add("cover");
+                }
+                else noPicture = true;
             }
-            else thumb = SaveImage(f.Image, Config.ThumbDir, Config.KeyFor(row.Str("path")) + "_custom", true);
+            else
+            {
+                thumb = SaveFirstImage(f, Config.ThumbDir, Config.KeyFor(row.Str("path")) + "_custom", true);
+                noPicture = thumb == null;
+            }
         }
         Db.InTransaction(() =>
         {
@@ -629,6 +766,7 @@ public static class Scrape
             }
             if (applied.Count > 0) Db.Execute("UPDATE videos SET scraped = 1 WHERE id = ?", id);
         });
+        if (noPicture && applied.Count > 0) applied.Add("(the picture could not be downloaded)");
         Catalog.Touch();
         return applied;
     }

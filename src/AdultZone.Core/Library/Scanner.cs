@@ -223,6 +223,50 @@ public static class Scanner
         }
     }
 
+    /// <summary>What a file's own name and folder say about it.</summary>
+    static Parsed Read(string file, string root, string kind, bool folderAsStudio, bool twoPart)
+    {
+        var meta = Names.Parse(file, root, folderAsStudio, twoPart);
+        if (kind == "movie")
+        {
+            // A movie's file name is its title; "Studio - Actor" reading is for scenes.
+            var full = Names.Parse(file, root, false, false);
+            meta = new Parsed { Title = Names.TitleCase(Names.Clean(Path.GetFileNameWithoutExtension(file))), ReleaseDate = full.ReleaseDate };
+            if (meta.ReleaseDate.Length >= 4) meta.Title = meta.Title.Replace(meta.ReleaseDate[..4], "").Trim(' ', '-');
+            if (meta.Title.Length == 0) meta.Title = Path.GetFileNameWithoutExtension(file);
+        }
+        return meta;
+    }
+
+    /// <summary>
+    /// A video put back to what its file name says: fetched title, description, studio,
+    /// cast, tags and picture all dropped, and a frame from the video as its thumbnail again.
+    /// </summary>
+    public static void Reset(long id)
+    {
+        var row = Db.QueryOne("SELECT path, kind, cover FROM videos WHERE id = ?", id);
+        if (row == null) return;
+        var file = row.Str("path");
+        var root = Db.Query("SELECT path FROM locations").Select(l => l.Str("path"))
+            .Where(l => file.StartsWith(l.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(l => l.Length).FirstOrDefault() ?? Path.GetDirectoryName(file) ?? "";
+        var meta = Read(file, root, row.Str("kind") == "movie" ? "movie" : "scene", Db.SettingOn("folder_as_studio"), Db.SettingOn("two_part_actor"));
+        Db.InTransaction(() =>
+        {
+            Db.Execute("UPDATE videos SET title = ?, description = '', studio_id = ?, subsite = NULL, release_date = ?, cover = NULL WHERE id = ?",
+                meta.Title, Db.GetOrCreate("studios", meta.Studio), meta.ReleaseDate.Length > 0 ? meta.ReleaseDate : null, id);
+            Db.Execute("DELETE FROM video_actors WHERE video_id = ?", id);
+            Db.Execute("DELETE FROM video_tags WHERE video_id = ?", id);
+            foreach (var actor in meta.Actors)
+                if (Db.GetOrCreate("actors", actor) is long actorId)
+                    Db.Execute("INSERT OR IGNORE INTO video_actors (video_id, actor_id) VALUES (?,?)", id, actorId);
+        });
+        if (row.Str("cover") is { Length: > 0 } cover)
+            try { File.Delete(Path.Combine(Config.ThumbDir, cover)); } catch { }
+        Catalog.Touch();
+        Rebuild(id);
+    }
+
     static void Ingest(string file, string root, long locationId, bool folderAsStudio, bool twoPart)
     {
         var existing = Db.QueryOne("SELECT id, missing FROM videos WHERE path = ?", file);
@@ -243,15 +287,7 @@ public static class Scanner
             .OrderByDescending(l => l.Str("path").Length).FirstOrDefault();
         var ownerId = owner?.Long("id") ?? locationId;
         var kind = owner?.Str("kind") is "movie" ? "movie" : "scene";
-        var meta = Names.Parse(file, root, folderAsStudio, twoPart);
-        if (kind == "movie")
-        {
-            // A movie's file name is its title; "Studio - Actor" reading is for scenes.
-            var full = Names.Parse(file, root, false, false);
-            meta = new Parsed { Title = Names.TitleCase(Names.Clean(Path.GetFileNameWithoutExtension(file))), ReleaseDate = full.ReleaseDate };
-            if (meta.ReleaseDate.Length >= 4) meta.Title = meta.Title.Replace(meta.ReleaseDate[..4], "").Trim(' ', '-');
-            if (meta.Title.Length == 0) meta.Title = Path.GetFileNameWithoutExtension(file);
-        }
+        var meta = Read(file, root, kind, folderAsStudio, twoPart);
         var studioId = Db.GetOrCreate("studios", meta.Studio);
         long size = 0;
         try { size = new FileInfo(file).Length; } catch { }

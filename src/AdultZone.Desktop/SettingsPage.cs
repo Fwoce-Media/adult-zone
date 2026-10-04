@@ -41,6 +41,8 @@ public static class SettingsPage
         stack.Children.Add(Sources(win));
         stack.Children.Add(BatchScrape(win));
         stack.Children.Add(ScreenLock(win));
+        stack.Children.Add(FfmpegPanel(win));
+        stack.Children.Add(UpdatesPanel(win));
         stack.Children.Add(About(win));
         stack.Children.Add(FileNames());
         return Ui.Page(stack);
@@ -406,6 +408,109 @@ public static class SettingsPage
             }, Ui.Look.Warn, small: true).Margin(0, 0, 10, 10));
         }
         return Ui.Panel("Screen lock", state, row, buttons);
+    }
+
+    // ---------------------------------------------------------------- ffmpeg
+    static string Size(long bytes) => bytes >= 1 << 20 ? $"{bytes / 1048576.0:0.#} MB" : $"{bytes / 1024.0:0} KB";
+
+    static FrameworkElement FfmpegPanel(MainWindow win)
+    {
+        var state = Ui.Text("", 13, Theme.Muted, wrap: true);
+        state.FontFamily = Theme.Mono;
+        var bar = new ContentControl { Focusable = false, Margin = new Thickness(0, 12, 0, 0), Visibility = Visibility.Collapsed };
+        Button install = null!;
+        void Show()
+        {
+            var found = AdultZone.Core.Media.Ffmpeg.FfmpegPath;
+            state.Text = found ?? "Not installed";
+            state.Foreground = found != null ? Theme.Muted : Theme.Warn;
+            install.Visibility = found == null ? Visibility.Visible : Visibility.Collapsed;
+        }
+        install = Ui.Button("Install FFmpeg", async () =>
+        {
+            install.IsEnabled = false;
+            bar.Visibility = Visibility.Visible;
+            try
+            {
+                await Task.Run(() => FfmpegInstall.Install((done, total) => win.Dispatcher.BeginInvoke(() =>
+                {
+                    bar.Content = Ui.ProgressBar(total > 0 ? (double)done / total : 0);
+                    state.Text = total > 0 ? $"{Size(done)} of {Size(total)}" : Size(done);
+                    state.Foreground = Theme.Muted;
+                })));
+                win.Toast("FFmpeg installed");
+            }
+            catch (Exception ex) { win.Toast(ex.Message, true); }
+            bar.Visibility = Visibility.Collapsed;
+            install.IsEnabled = true;
+            Show();
+        }, Ui.Look.Ember, small: true);
+        install.HorizontalAlignment = HorizontalAlignment.Left;
+        install.Margin = new Thickness(0, 12, 0, 0);
+        Show();
+        return Ui.Panel("FFmpeg", state, bar, install);
+    }
+
+    // --------------------------------------------------------------- updates
+    static FrameworkElement UpdatesPanel(MainWindow win)
+    {
+        var state = Ui.Text("", 13, Theme.Muted, wrap: true);
+        var bar = new ContentControl { Focusable = false, Margin = new Thickness(0, 12, 0, 0), Visibility = Visibility.Collapsed };
+        Button check = null!, get = null!;
+        void Show(string? note = null)
+        {
+            var found = Updates.Available;
+            state.Text = note ?? (found != null ? $"Version {found.Version} available" : $"Version {Config.AppVersion}");
+            state.Foreground = found != null && note == null ? Theme.Ember : Theme.Muted;
+            get.Visibility = found != null ? Visibility.Visible : Visibility.Collapsed;
+        }
+        check = Ui.Button("Check for updates", async () =>
+        {
+            check.IsEnabled = false;
+            Show("Checking…");
+            try
+            {
+                var found = await Task.Run(Updates.Check);
+                Show(found == null ? $"Version {Config.AppVersion} is the latest" : null);
+            }
+            catch (Exception ex) { Show(ex.Message); }
+            check.IsEnabled = true;
+        }, small: true);
+        get = Ui.Button("Download and install", async () =>
+        {
+            if (Updates.Available is not { } release) return;
+            get.IsEnabled = check.IsEnabled = false;
+            bar.Visibility = Visibility.Visible;
+            try
+            {
+                var setup = await Task.Run(() => Updates.Download(release, (done, total) => win.Dispatcher.BeginInvoke(() =>
+                {
+                    bar.Content = Ui.ProgressBar(total > 0 ? (double)done / total : 0);
+                    state.Text = total > 0 ? $"{Size(done)} of {Size(total)}" : Size(done);
+                    state.Foreground = Theme.Muted;
+                })));
+                // The installer takes over; this copy steps aside so its files can be replaced.
+                Process.Start(new ProcessStartInfo(setup) { UseShellExecute = true });
+                Application.Current.Shutdown();
+                return;
+            }
+            catch (Exception ex)
+            {
+                // No installer on the release, or it would not run: its page has the downloads.
+                win.Toast(ex.Message, true);
+                try { Process.Start(new ProcessStartInfo(release.Page) { UseShellExecute = true }); } catch { }
+            }
+            bar.Visibility = Visibility.Collapsed;
+            get.IsEnabled = check.IsEnabled = true;
+            Show();
+        }, Ui.Look.Ember, small: true);
+        var onStart = new CheckBox { Content = "Check when Adult Zone starts", IsChecked = Updates.OnStart, FontSize = 13.5, Margin = new Thickness(0, 14, 0, 0) };
+        onStart.Checked += (_, _) => Db.SetSetting(Updates.Setting, true);
+        onStart.Unchecked += (_, _) => Db.SetSetting(Updates.Setting, false);
+        var buttons = Ui.Row(check, get.Margin(10, 0, 0, 0));
+        buttons.Margin = new Thickness(0, 12, 0, 0);
+        Show();
+        return Ui.Panel("Updates", state, bar, buttons, onStart);
     }
 
     // ----------------------------------------------------------------- about

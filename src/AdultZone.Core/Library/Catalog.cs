@@ -73,7 +73,7 @@ public static class Catalog
         {
             var chunk = ids.Skip(start).Take(400).Cast<object?>().ToArray();
             var marks = string.Join(",", chunk.Select(_ => "?"));
-            foreach (var r in Db.Query($"SELECT va.video_id, a.id, a.name, a.image, a.gender FROM actors a JOIN video_actors va ON va.actor_id = a.id " +
+            foreach (var r in Db.Query($"SELECT va.video_id, a.id, a.name, a.image, a.image_pos, a.gender, a.birthdate FROM actors a JOIN video_actors va ON va.actor_id = a.id " +
                                        $"WHERE va.video_id IN ({marks}) ORDER BY a.name COLLATE NOCASE", chunk))
             {
                 var vid = r.Long("video_id") ?? 0;
@@ -533,8 +533,40 @@ public static class Catalog
         SetPictureColumn("actors", column, Config.ActorDir, id, name);
     }
 
+    /// <summary>
+    /// How a picture sits in its frame: which point of it is kept in view (0 to 1 across and down)
+    /// and how far it is zoomed in (1 is the whole width or height). Stored as "x,y,zoom".
+    /// </summary>
+    public static (double X, double Y, double Zoom) PicturePos(string? stored, double x = 0.5, double y = 0.3)
+    {
+        var parts = (stored ?? "").Split(',');
+        double Part(int i, double fallback) =>
+            parts.Length > i && double.TryParse(parts[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : fallback;
+        return (Math.Clamp(Part(0, x), 0, 1), Math.Clamp(Part(1, y), 0, 1), Math.Clamp(Part(2, 1), 1, 4));
+    }
+
+    public static void SetActorPicturePos(long id, string column, double x, double y, double zoom)
+    {
+        var value = string.Join(",", new[] { x, y, zoom }.Select(v => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+        Db.Execute($"UPDATE actors SET {(column == "banner" ? "banner_pos" : "image_pos")} = ? WHERE id = ?", value, id);
+        Touch();
+    }
+
+    /// <summary>Takes a performer's photo or wide photo away, file and all.</summary>
+    public static void RemoveActorPicture(long id, string column)
+    {
+        column = column == "banner" ? "banner" : "image";
+        var previous = Db.QueryOne($"SELECT {column} AS f FROM actors WHERE id = ?", id)?.Str("f") ?? "";
+        if (previous.Length > 0)
+            try { File.Delete(Path.Combine(Config.ActorDir, previous)); } catch { }
+        Db.Execute($"UPDATE actors SET {column} = NULL, {column}_pos = NULL WHERE id = ?", id);
+        Touch();
+    }
+
     public static void SetPictureColumn(string table, string column, string folder, long id, string name)
     {
+        // A new picture starts where pictures usually sit, not where the last one was placed.
+        if (table == "actors" && column is "image" or "banner") Db.Execute($"UPDATE actors SET {column}_pos = NULL WHERE id = ?", id);
         var previous = Db.QueryOne($"SELECT {column} AS f FROM {table} WHERE id = ?", id)?.Str("f") ?? "";
         if (previous.Length > 0 && previous != name)
             try { File.Delete(Path.Combine(folder, previous)); } catch { }

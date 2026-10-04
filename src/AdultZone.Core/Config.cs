@@ -8,7 +8,7 @@ namespace AdultZone.Core;
 public static class Config
 {
     public const string AppName = "Adult Zone";
-    public const string AppVersion = "3.2.1";
+    public const string AppVersion = "3.5.0";
 
     /// <summary>
     /// Portable mode: a portable.txt beside the program keeps the whole library

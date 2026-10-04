@@ -111,6 +111,7 @@ public static class Cards
         if (width != null) card.Width = width.Value;
         card.VerticalAlignment = VerticalAlignment.Top;
         card.Cursor = Cursors.Hand;
+        VideoMenu.Attach(card, win, v);
         card.MouseEnter += (_, _) =>
         {
             lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-4, Quick) { EasingFunction = new CubicEase() });
@@ -179,6 +180,7 @@ public static class Cards
         if (width != null) card.Width = width.Value;
         card.VerticalAlignment = VerticalAlignment.Top;
         card.Cursor = Cursors.Hand;
+        VideoMenu.Attach(card, win, v);
         card.MouseEnter += (_, _) =>
         {
             lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-4, Quick) { EasingFunction = new CubicEase() });
@@ -261,7 +263,8 @@ public static class Cards
         initials.Foreground = new SolidColorBrush(Color.FromRgb(0x2E, 0x2E, 0x39));
         initials.HorizontalAlignment = HorizontalAlignment.Center;
         initials.VerticalAlignment = VerticalAlignment.Center;
-        if (photo.Length > 0 && File.Exists(photo)) Ui.Cover(face, photo, 0.5, 0.3, decode: 600, fade: true);
+        var (px, py, pz) = Catalog.PicturePos(a.Str("image_pos"));
+        if (photo.Length > 0 && File.Exists(photo)) Ui.Cover(face, photo, px, py, decode: pz > 1.5 ? 1200 : 600, fade: true, zoom: pz);
         else grid.Children.Add(initials);
         return grid;
     }

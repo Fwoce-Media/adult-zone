@@ -109,6 +109,13 @@ public sealed class MainWindow : Window
             if (Lock.Enabled) LockScreen.Show();
             await Task.Delay(1500);
             _ = Player.EnsureVlcAsync();
+            // A look on GitHub for a newer release; silent unless there is one.
+            if (Updates.OnStart)
+                _ = Task.Run(() =>
+                {
+                    try { if (Updates.Check() is { } found) Toast($"Update available: version {found.Version} (Settings)"); }
+                    catch { }
+                });
         };
         SourceInitialized += (_, _) =>
         {

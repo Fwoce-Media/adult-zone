@@ -194,6 +194,23 @@ public static class Batch
         }
         foreach (var query in Queries(o.Kind, t))
             if (Take(Scrape.Search(o.Provider, kind, query, o.Kind == "video" ? 20 : 8)) is { } found) return found;
+        if (o.Kind == "video")
+        {
+            // Still nothing clear: the title a part at a time, and its most telling words beside the performers.
+            // A source's title often leaves out part of ours, or says the same thing in other words.
+            var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (site, query) in Looser(t))
+            {
+                if (!tried.Add(site + "|" + query)) continue;
+                List<Found> hits;
+                try
+                {
+                    hits = site.Length > 0 && o.Provider == "tpdb" && kind == "scene" ? Scrape.TpdbSiteScenes(site, query) : Scrape.Search(o.Provider, kind, query, 20);
+                }
+                catch (SourceError ex) when (ex.Status is 400 or 404 or 422) { continue; }
+                if (Take(hits.Where(h => Score(t, h) > 0).ToList()) is { } found) return found;
+            }
+        }
         return (null, Rank(t, all).Select(x => x.Hit).Take(10).ToList());
     }
 
@@ -259,6 +276,32 @@ public static class Batch
         return string.Join(" ", new[] { t.Site.Length > 0 ? t.Site : t.Studio, who, title }.Where(x => x.Length > 0)).Trim();
     }
 
+    /// <summary>The parts of a title set apart by dashes, colons or bars, each with at least two telling words.</summary>
+    public static List<string> Segments(string title) =>
+        System.Text.RegularExpressions.Regex.Split(title, @"\s+[-–—:|]\s+|\s*[–—|]\s*")
+            .Select(Clean).Where(p => Words(p).Count >= 2).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Looser searches, as (site, query): site blank for a search of everything.</summary>
+    static IEnumerable<(string Site, string Query)> Looser(Target t)
+    {
+        var title = TitleIsCast(t) ? "" : t.Title;
+        var who = string.Join(" ", t.Cast.Take(2));
+        var segments = Segments(title);
+        if (segments.Count < 2) segments = new();
+        foreach (var site in new[] { t.Site, t.Studio }.Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var part in segments) yield return (site, part);
+        foreach (var part in segments)
+        {
+            if (who.Length > 0) yield return ("", who + " " + part);
+            yield return ("", part);
+        }
+        if (who.Length == 0) yield break;
+        // Names and other long words say most: "Chanel Preston Mandingo" finds what the full title does not.
+        var cast = t.Cast.SelectMany(Words).ToHashSet();
+        foreach (var word in TitleWords(t).Where(w => w.Length >= 5 && !cast.Contains(w)).OrderByDescending(w => w.Length).Take(3))
+            yield return ("", who + " " + word);
+    }
+
     static bool TitleIsCast(Target t) =>
         t.Cast.Count > 0 && Norm(t.Title) == Norm(string.Join("", t.Cast.Take(3)));
 
@@ -301,7 +344,11 @@ public static class Batch
     {
         var score = 0;
         var ours = TitleWords(t);
+        // A title led by the cast ("Cory Chase in ...", "... - Nicole Doshi") is compared without their names.
+        var castWords = t.Cast.SelectMany(Words).ToHashSet();
         var theirs = Words(Clean(h.Name));
+        var named1 = theirs.Where(w => !castWords.Contains(w)).ToList();
+        if (named1.Count >= 2) theirs = named1;
         if (ours.Count > 0 && theirs.Count > 0)
         {
             var shared = theirs.Count(ours.Contains);
@@ -321,7 +368,9 @@ public static class Batch
 
         if (h.Performers.Count > 0)
         {
-            var named = t.Cast.Count(c => h.Performers.Any(p => Norm(p) == Norm(c)));
+            var theirTitle = Norm(h.Name);
+            // Listed in their cast, or named in their title.
+            var named = t.Cast.Count(c => h.Performers.Any(p => Norm(p) == Norm(c)) || (Norm(c).Length >= 6 && theirTitle.Contains(Norm(c))));
             // A first or last name of theirs in our title or file name.
             var mentioned = h.Performers.Count(p => Words(p).Any(w => w.Length >= 3 && ours.Contains(w)) && !t.Cast.Any(c => Norm(c) == Norm(p)));
             if (t.Cast.Count > 0 && named == t.Cast.Count) score += 3;
@@ -333,7 +382,9 @@ public static class Batch
         var known = new[] { t.Site, t.Studio }.Where(x => x.Length > 0).ToList();
         if (known.Count > 0 && (h.Site.Length > 0 || h.Studio.Length > 0))
         {
-            if (known.Any(k => Norm(h.Site) == Norm(k) || Norm(h.Studio) == Norm(k))) score += 3;
+            // The same name, or ours inside theirs ("Manyvids: Rocket Powers" is Rocketpowers).
+            bool Same(string theirs, string ours) => Norm(theirs) == Norm(ours) || (Norm(ours).Length >= 6 && Norm(theirs).Contains(Norm(ours)));
+            if (known.Any(k => Same(h.Site, k) || Same(h.Studio, k))) score += 3;
             else score -= 1;
         }
         if (t.Date.Length >= 10 && h.Date == t.Date[..10]) score += 2;

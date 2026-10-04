@@ -108,8 +108,10 @@ public static class ImportDialog
 
         FrameworkElement ResultRow(Found hit)
         {
-            var art = new Border { Width = 58, Height = 78, CornerRadius = new CornerRadius(6), Background = Theme.Panel2, ClipToBounds = true };
-            if (hit.Image.Length > 0) Ui.Cover(art, hit.Image, decode: 160);
+            // Scenes are wide stills; performers, studios' logos and movie covers stand upright.
+            var wide = searchKind == "scene";
+            var art = new Border { Width = wide ? 176 : 74, Height = wide ? 99 : 100, CornerRadius = new CornerRadius(6), Background = Theme.Ink, ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top };
+            Ui.Whole(art, hit.ImageChoices(), 360);
             var text = new StackPanel { Margin = new Thickness(12, 0, 0, 0) };
             text.Children.Add(Ui.Text(hit.Name.Length > 0 ? hit.Name : "Untitled", 14, Theme.Text, FontWeights.SemiBold));
             var sub = string.Join(" · ", new[] { hit.Subtitle, hit.Date }.Where(s => s.Length > 0));
@@ -174,7 +176,14 @@ public static class ImportDialog
         {
             if (key is "image" or "banner")
             {
-                var img = Images.Lazy(key == "image" ? f.Image : f.Banner, 380, Stretch.Uniform);
+                if (key == "image")
+                {
+                    // The first of the picture's addresses that still answers, as it will be saved.
+                    var frame = new Border { MaxWidth = 230, MinHeight = 20, HorizontalAlignment = HorizontalAlignment.Left, CornerRadius = new CornerRadius(6), ClipToBounds = true };
+                    Ui.Whole(frame, f.ImageChoices(), 460);
+                    return frame;
+                }
+                var img = Images.Lazy(f.Banner, 380, Stretch.Uniform);
                 img.MaxWidth = 190;
                 img.MaxHeight = 130;
                 img.HorizontalAlignment = HorizontalAlignment.Left;

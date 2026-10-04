@@ -91,6 +91,8 @@ public static class Db
         ("videos", "subsite", "TEXT"),
         ("videos", "position", "REAL DEFAULT 0"),
         ("actors", "banner", "TEXT"),
+        ("actors", "image_pos", "TEXT"),
+        ("actors", "banner_pos", "TEXT"),
         ("actors", "source", "TEXT"),
         ("actors", "country", "TEXT"),
         ("actors", "status", "TEXT"),

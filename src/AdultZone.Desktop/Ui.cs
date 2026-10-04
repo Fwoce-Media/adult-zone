@@ -317,7 +317,22 @@ public static class Ui
     }
 
     /// <summary>Paints a picture over an element like CSS background-size: cover, anchored at a point.</summary>
-    public static void Cover(Border host, string? path, double anchorX = 0.5, double anchorY = 0.5, int decode = 1920, bool fade = false)
+    /// <summary>
+    /// The part of a picture that fills a frame: as a share of the picture's width and height,
+    /// placed by the point kept in view and narrowed by the zoom.
+    /// </summary>
+    public static Rect CoverBox(double picture, double box, double anchorX, double anchorY, double zoom = 1)
+    {
+        double w = 1, h = 1;
+        if (picture > box) w = box / picture;
+        else h = picture / box;
+        zoom = Math.Max(1, zoom);
+        w /= zoom;
+        h /= zoom;
+        return new Rect((1 - w) * anchorX, (1 - h) * anchorY, w, h);
+    }
+
+    public static void Cover(Border host, string? path, double anchorX = 0.5, double anchorY = 0.5, int decode = 1920, bool fade = false, double zoom = 1)
     {
         if (string.IsNullOrEmpty(path)) return;
         host.Tag = path;
@@ -330,24 +345,35 @@ public static class Ui
             void Fit()
             {
                 if (host.ActualWidth <= 0 || host.ActualHeight <= 0) return;
-                var box = host.ActualWidth / host.ActualHeight;
-                var pic = (double)bmp.PixelWidth / bmp.PixelHeight;
-                if (pic > box)
-                {
-                    var w = box / pic;
-                    brush.Viewbox = new Rect((1 - w) * anchorX, 0, w, 1);
-                }
-                else
-                {
-                    var h = pic / box;
-                    brush.Viewbox = new Rect(0, (1 - h) * anchorY, 1, h);
-                }
+                brush.Viewbox = CoverBox((double)bmp.PixelWidth / bmp.PixelHeight, host.ActualWidth / host.ActualHeight, anchorX, anchorY, zoom);
             }
             Fit();
             host.SizeChanged += (_, _) => { if (ReferenceEquals(host.Background, brush)) Fit(); };
             host.Background = brush;
             if (fade) brush.BeginAnimation(Brush.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220)));
         }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    /// <summary>
+    /// A match's picture shown whole inside its frame, from the first of its addresses that still answers.
+    /// </summary>
+    public static async void Whole(Border host, IEnumerable<string> addresses, int decode)
+    {
+        var list = addresses.Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
+        if (list.Count == 0) return;
+        host.Tag = list[0];
+        foreach (var address in list)
+        {
+            BitmapSource? bmp;
+            try { bmp = await Images.LoadAsync(address, decode); }
+            catch { bmp = null; }
+            if (!Equals(host.Tag, list[0])) return;
+            if (bmp == null || bmp.PixelWidth == 0 || bmp.PixelHeight == 0) continue;
+            var image = new Image { Source = bmp, Stretch = Stretch.Uniform };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            host.Child = image;
+            return;
+        }
     }
 
     /// <summary>A small scroller inside a page: it takes the wheel while it can move, then hands it on.</summary>

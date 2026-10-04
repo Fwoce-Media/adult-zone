@@ -634,7 +634,8 @@ public static class Pages
         {
             // Behind the right-hand side, fading out before it reaches the text.
             var art = new Border { HorizontalAlignment = HorizontalAlignment.Right, Opacity = 0.78 };
-            Ui.Cover(art, banner, 0.5, 0.3, 1600, fade: true);
+            var (bx, by, bz) = Catalog.PicturePos(a.Str("banner_pos"));
+            Ui.Cover(art, banner, bx, by, 1600, fade: true, zoom: bz);
             art.OpacityMask = new LinearGradientBrush
             {
                 StartPoint = new Point(0, 0), EndPoint = new Point(1, 0),
@@ -665,6 +666,10 @@ public static class Pages
         }
         head.SizeChanged += (_, _) => SizePortrait();
         SizePortrait();
+        // Right-click: the photo's menu on the photo, the wide photo's anywhere else in the heading.
+        PictureTools.Attach(portrait, win, a, "image");
+        head.Background = Theme.Clear;
+        PictureTools.Attach(head, win, a, "banner");
 
         var info = new StackPanel { Margin = new Thickness(36, 0, 0, 0), MinWidth = 260 };
         info.Children.Add(Ui.Eyebrow("Pornstar"));

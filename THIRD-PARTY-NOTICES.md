@@ -6,6 +6,7 @@ Adult Zone is MIT licensed (see [LICENSE](LICENSE)). It includes or uses:
 |---|---|---|
 | [LibVLC](https://www.videolan.org/vlc/libvlc.html) | LGPL 2.1 or later | playback |
 | [LibVLCSharp](https://code.videolan.org/videolan/LibVLCSharp) | LGPL 2.1 or later | connecting the app to LibVLC |
+| [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | Microsoft Software License (BSD-style SDK) | showing Babepedia pages |
 | [flag-icons](https://github.com/lipis/flag-icons) | MIT | nationality flags |
 
 LibVLC and LibVLCSharp are included unmodified, as separate libraries in the

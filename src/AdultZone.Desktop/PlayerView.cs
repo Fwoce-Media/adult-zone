@@ -1004,6 +1004,17 @@ public sealed class PlayerView : Grid
         _below.ScrollToTop();
     }
 
+    /// <summary>Whole years between a date of birth and a release date; null when either is missing or they make no sense.</summary>
+    public static int? AgeAt(string birthdate, string released)
+    {
+        if (birthdate.Length < 10 || released.Length < 10) return null;
+        if (!DateTime.TryParse(birthdate[..10], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var born)) return null;
+        if (!DateTime.TryParse(released[..10], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var then)) return null;
+        var age = then.Year - born.Year;
+        if (then < born.AddYears(age)) age--;
+        return age is >= 18 and < 100 ? age : null;
+    }
+
     /// <summary>A performer's portrait and name; opens their page.</summary>
     FrameworkElement Profile(Row a)
     {
@@ -1024,7 +1035,11 @@ public sealed class PlayerView : Grid
             name.Children.Add(mark);
         }
         name.Children.Add(nameText);
-        var b = Ui.Bare(Ui.Column(frame, name), async () =>
+        var column = Ui.Column(frame, name);
+        // How old they were when this was released, from their date of birth.
+        if (AgeAt(a.Str("birthdate"), _video?.Str("release_date") ?? "") is { } age)
+            column.Children.Add(Ui.Text($"{age} in this scene", 11.5, Theme.Muted, margin: new Thickness(0, 2, 0, 0)));
+        var b = Ui.Bare(column, async () =>
         {
             await CloseAsync();
             _win.Navigate(new Location("actor", id));

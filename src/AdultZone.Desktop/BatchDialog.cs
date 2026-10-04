@@ -355,9 +355,9 @@ public static class BatchDialog
             var portrait = o.Kind == "actor";
             var art = new Border
             {
-                Width = portrait ? 46 : 104, Height = portrait ? 62 : 58, CornerRadius = new CornerRadius(6), Background = Theme.Panel3, ClipToBounds = true,
+                Width = portrait ? 66 : 176, Height = portrait ? 90 : 99, CornerRadius = new CornerRadius(6), Background = Theme.Ink, ClipToBounds = true,
             };
-            if (hit.Image.Length > 0) Ui.Cover(art, hit.Image, decode: 220);
+            Ui.Whole(art, hit.ImageChoices(), 360);
             var text = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             var name = Ui.Text(hit.Name.Length > 0 ? hit.Name : "Untitled", 13.5, Theme.Text, FontWeights.SemiBold);
             name.TextTrimming = TextTrimming.CharacterEllipsis;

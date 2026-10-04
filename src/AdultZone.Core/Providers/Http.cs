@@ -15,6 +15,7 @@ public sealed class SourceError : Exception
 public static class Http
 {
     public const string UserAgent = "AdultZone/3.0 (personal media library)";
+    const string BrowserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
     public const int MaxImageBytes = 12 * 1024 * 1024;
 
     static readonly HttpClient Client = new(new SocketsHttpHandler
@@ -29,7 +30,10 @@ public static class Http
     static HttpResponseMessage Send(string url, IDictionary<string, string>? headers)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
+        // Babepedia has no API and only answers what looks like a browser.
+        var site = url.Contains("://www.babepedia.com/", StringComparison.OrdinalIgnoreCase);
+        request.Headers.TryAddWithoutValidation("User-Agent", site ? BrowserAgent : UserAgent);
+        if (site) request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
         if (headers != null)
             foreach (var (k, v) in headers) request.Headers.TryAddWithoutValidation(k, v);
         try { return Client.Send(request); }
@@ -82,6 +86,55 @@ public static class Http
             404 => "That address returned nothing (404).",
             var code => $"The source returned HTTP {code}." + said,
         };
+    }
+
+    // Large files: no overall time limit, only one on each wait for more.
+    static readonly HttpClient Downloader = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+    {
+        Timeout = System.Threading.Timeout.InfiniteTimeSpan,
+    };
+
+    /// <summary>
+    /// A file fetched to disk a piece at a time, written beside its place first so a
+    /// broken download never leaves half a file there. Progress is bytes so far and the
+    /// total (the size given when the host does not say).
+    /// </summary>
+    public static void Download(string url, string file, long expected, Action<long, long> progress)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
+        var part = file + ".part";
+        try
+        {
+            using var response = Downloader.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode) throw new SourceError($"The download was refused (HTTP {(int)response.StatusCode}).", (int)response.StatusCode);
+            var total = response.Content.Headers.ContentLength ?? expected;
+            using (var stream = response.Content.ReadAsStream())
+            using (var output = File.Create(part))
+            {
+                var buffer = new byte[1 << 17];
+                long done = 0;
+                var last = DateTime.MinValue;
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    output.Write(buffer, 0, read);
+                    done += read;
+                    if (DateTime.UtcNow - last > TimeSpan.FromMilliseconds(150))
+                    {
+                        last = DateTime.UtcNow;
+                        progress(done, total);
+                    }
+                }
+                progress(done, total > 0 ? total : done);
+            }
+            File.Move(part, file, true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            try { File.Delete(part); } catch { }
+            throw new SourceError("The download did not finish: " + ex.Message);
+        }
     }
 
     /// <summary>A picture's bytes and what kind of picture it is.</summary>
