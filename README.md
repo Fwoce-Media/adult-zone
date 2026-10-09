@@ -16,7 +16,7 @@ panel that shows where ffmpeg was found and installs a copy when there is none.
 
 | | |
 |---|---|
-| **Setup.exe** | Installs normally, with a Start menu entry and an uninstaller. |
+| **Setup.exe** | Asks for administrator rights, installs to Program Files (or any folder you choose), with a Start menu entry and an uninstaller. Can fetch FFmpeg for you. |
 | **Portable zip** | Unzip and run. Everything stays in its own folder. |
 
 Windows 10 or 11, 64-bit. Both are on the [Releases](../../releases) page.
@@ -24,8 +24,8 @@ Windows 10 or 11, 64-bit. Both are on the [Releases](../../releases) page.
 ### ffmpeg
 
 Needed for thumbnails, previews and seek-bar frames. Browsing and playback
-work without it. Install it so it is on your PATH, or put `ffmpeg.exe` and
-`ffprobe.exe` in a folder called `ffmpeg` next to the program.
+work without it. Setup can fetch it, Settings can install it, or put
+`ffmpeg.exe` and `ffprobe.exe` in a folder called `ffmpeg` next to the program.
 
 ## What it does
 

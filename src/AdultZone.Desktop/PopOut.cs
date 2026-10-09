@@ -185,14 +185,16 @@ public sealed class PopOutWindow : Window
 
         // bottom: the seek bar, then the time, sound and subtitles
         _seek.Margin = new Thickness(0, 0, 0, 2);
-        _seek.PreviewMouseLeftButtonDown += (_, _) => _seeking = true;
-        _seek.PreviewMouseLeftButtonUp += (_, _) =>
+        _seek.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _seeking = true), true);
+        _seek.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler((_, _) =>
         {
+            if (!_seeking) return;
             _seeking = false;
             _player.PopSeek(_seek.Value);
-        };
+        }), true);
         _seek.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) =>
         {
+            if (!_seeking) return;
             _seeking = false;
             _player.PopSeek(_seek.Value);
         }));

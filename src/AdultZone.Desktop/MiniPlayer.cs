@@ -23,6 +23,8 @@ public sealed class MiniPlayer : Border
     VlcMediaPlayer? _mp;
     Task<bool>? _starting;
     readonly Border _screen = new() { Background = Brushes.Black };
+    double _heldAt;
+    DateTime _heldUntil;
     readonly Slider _seek = new() { Minimum = 0, Maximum = 1, Focusable = false, IsMoveToPointEnabled = true, Margin = new Thickness(0, 10, 0, 6) };
     readonly TextBlock _caption = Ui.Text("", 13, Theme.Text, FontWeights.SemiBold);
     readonly TextBlock _heading = Ui.Text("", 15, Theme.Ember, FontWeights.Bold, margin: new Thickness(0, 0, 0, 4));
@@ -48,12 +50,18 @@ public sealed class MiniPlayer : Border
         Padding = new Thickness(12);
 
         _screen.SetBinding(HeightProperty, new System.Windows.Data.Binding(nameof(ActualWidth)) { Source = _screen, Converter = new Ratio() });
-        _seek.PreviewMouseLeftButtonDown += (_, _) => _dragging = true;
-        _seek.PreviewMouseLeftButtonUp += (_, _) =>
+        _seek.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
+        _seek.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler((_, _) =>
         {
+            if (!_dragging) return;
             _dragging = false;
-            if (_mp != null && _mp.IsSeekable) _mp.Position = (float)_seek.Value;
-        };
+            if (_mp != null && _mp.IsSeekable)
+            {
+                _mp.Position = (float)_seek.Value;
+                _heldAt = _seek.Value;
+                _heldUntil = DateTime.UtcNow.AddSeconds(2.5);
+            }
+        }), true);
         _seek.ValueChanged += (_, _) =>
         {
             if (_dragging) _time.Text = Clock(_seek.Value * _length) + " / " + Clock(_length);
@@ -95,7 +103,9 @@ public sealed class MiniPlayer : Border
         {
             if (_mp == null || _dragging) return;
             _length = Math.Max(0, _mp.Length / 1000.0);
-            _seek.Value = Math.Clamp(_mp.Position, 0, 1);
+            var at = (double)_mp.Position;
+            if (DateTime.UtcNow < _heldUntil && Math.Abs(at - _heldAt) * _length > 1.5) at = _heldAt;
+            _seek.Value = Math.Clamp(at, 0, 1);
             _time.Text = _length > 0 ? Clock(_mp.Time / 1000.0) + " / " + Clock(_length) : "";
         };
         Unloaded += (_, _) => Close();

@@ -256,14 +256,18 @@ public sealed class PlayerView : Grid
             GradientStops = { new GradientStop(Color.FromArgb(0xEB, 0, 0, 0), 0.2), new GradientStop(Color.FromArgb(0, 0, 0, 0), 1) },
         };
         var stack = new StackPanel();
-        _seek.PreviewMouseLeftButtonDown += (_, _) => _seeking = true;
-        _seek.PreviewMouseLeftButtonUp += (_, _) =>
+        // A click on the bar moves the slider before this sees the press and marks it handled, so it is listened
+        // for even when handled; otherwise the clock could pull the slider back before the button comes up.
+        _seek.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _seeking = true), true);
+        _seek.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler((_, _) =>
         {
+            if (!_seeking) return;
             _seeking = false;
             SeekTo(_seek.Value);
-        };
+        }), true);
         _seek.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) =>
         {
+            if (!_seeking) return;
             _seeking = false;
             SeekTo(_seek.Value);
         }));
@@ -701,7 +705,22 @@ public sealed class PlayerView : Grid
         var total = _duration > 0 ? _duration : _mp.Length / 1000.0;
         var target = Math.Clamp(seconds, 0, Math.Max(0, total - 1));
         _mp.Time = (long)(target * 1000);
+        // VLC takes a moment to get there; until it does, the bar and clock show where it is going, not where it was.
+        _heldAt = target;
+        _heldUntil = DateTime.UtcNow.AddSeconds(2.5);
         UpdateClock();
+    }
+
+    double _heldAt;
+    DateTime _heldUntil;
+
+    /// <summary>Where the video is, or where it was just sent while it gets there.</summary>
+    double Shown()
+    {
+        var now = Now();
+        if (DateTime.UtcNow < _heldUntil && Math.Abs(now - _heldAt) > 1.5) return _heldAt;
+        _heldUntil = DateTime.MinValue;
+        return now;
     }
 
     void SetRate(float rate)
@@ -767,7 +786,7 @@ public sealed class PlayerView : Grid
     {
         if (_mp == null) return;
         var total = _duration > 0 ? _duration : _mp.Length / 1000.0;
-        var now = Now();
+        var now = Shown();
         if (!_seeking)
         {
             _seek.Maximum = Math.Max(1, total);
