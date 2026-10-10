@@ -357,7 +357,7 @@ public static class Ui
     /// <summary>
     /// A match's picture shown whole inside its frame, from the first of its addresses that still answers.
     /// </summary>
-    public static async void Whole(Border host, IEnumerable<string> addresses, int decode)
+    public static async void Whole(Border host, IEnumerable<string> addresses, int decode, bool fitShape = false)
     {
         var list = addresses.Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
         if (list.Count == 0) return;
@@ -371,9 +371,19 @@ public static class Ui
             if (bmp == null || bmp.PixelWidth == 0 || bmp.PixelHeight == 0) continue;
             var image = new Image { Source = bmp, Stretch = Stretch.Uniform };
             RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            // The frame takes the picture's own shape: same height, as wide as the picture is.
+            if (fitShape) FitShape(host, (double)bmp.PixelWidth / bmp.PixelHeight, image);
             host.Child = image;
             return;
         }
+    }
+
+    /// <summary>Sizes a picture's frame to the picture: its height kept, its width following the picture's shape.</summary>
+    public static void FitShape(Border host, double aspect, Image image)
+    {
+        if (double.IsNaN(host.Height) || host.Height <= 0 || aspect <= 0) return;
+        host.Width = Math.Round(Math.Clamp(host.Height * aspect, host.Height * 0.45, host.Height * 2.6));
+        image.Stretch = Stretch.UniformToFill;
     }
 
     /// <summary>A small scroller inside a page: it takes the wheel while it can move, then hands it on.</summary>

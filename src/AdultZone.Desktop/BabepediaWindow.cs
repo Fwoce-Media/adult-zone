@@ -95,7 +95,9 @@ public static class BabepediaWindow
                 bmp.StreamSource = new MemoryStream(data);
                 bmp.EndInit();
                 bmp.Freeze();
-                art.Child = new Image { Source = bmp, Stretch = System.Windows.Media.Stretch.Uniform };
+                var picture = new Image { Source = bmp, Stretch = System.Windows.Media.Stretch.Uniform };
+                Ui.FitShape(art, (double)bmp.PixelWidth / bmp.PixelHeight, picture);
+                art.Child = picture;
                 frame.Cursor = Cursors.Hand;
                 frame.MouseEnter += (_, _) => frame.BorderBrush = Theme.Ember;
                 frame.MouseLeave += (_, _) => frame.BorderBrush = Theme.LineSoft;

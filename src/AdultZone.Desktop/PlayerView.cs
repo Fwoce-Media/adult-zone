@@ -286,11 +286,12 @@ public sealed class PlayerView : Grid
         };
         _time.VerticalAlignment = VerticalAlignment.Center;
         _time.Margin = new Thickness(12, 0, 10, 0);
-        row.Children.Add(Ui.Row(_playButton, _prevButton, _backButton, _fwdButton, _nextButton, _muteButton, _volume, _time));
+        row.Children.Add(Ui.Row(_playButton, _prevButton, _backButton, _fwdButton, _nextButton));
         var popOut = Ctl(Glyphs.PopOut(), "Pop out", () => _ = PopOut());
         var full = Ctl(Glyphs.FullScreen(), "Full screen", ToggleFullscreen);
         full.Margin = new Thickness(0);
-        var rightGroup = Ui.Row(_ccButton, _gearButton, popOut, full);
+        // Sound and time sit beside the menus.
+        var rightGroup = Ui.Row(_muteButton, _volume, _time, _ccButton, _gearButton, popOut, full);
         DockPanel.SetDock(rightGroup, Dock.Right);
         row.Children.Add(rightGroup);
         stack.Children.Add(row);
@@ -391,6 +392,8 @@ public sealed class PlayerView : Grid
                     App.Log("VLC refused the sound options, starting without them: " + ex.Message);
                     v = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--avcodec-hw=any");
                 }
+                // Shown by that name in Windows' volume mixer, rather than as "VLC media player".
+                v.SetUserAgent(AdultZone.Core.Config.AppName, AdultZone.Core.Config.AppName + "/" + AdultZone.Core.Config.AppVersion);
                 var m = new VlcMediaPlayer(v)
                 {
                     EnableHardwareDecoding = true,

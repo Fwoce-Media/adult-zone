@@ -12,7 +12,7 @@
 #define AppExe       "AdultZone.exe"
 #define AppIdKey     "{7C4E5A92-3D18-4B6E-9A2C-ADULTZONE0001}_is1"
 #ifndef AppVersion
-  #define AppVersion "3.6.0"
+  #define AppVersion "3.7.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\publish"

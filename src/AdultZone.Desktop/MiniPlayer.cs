@@ -133,6 +133,8 @@ public sealed class MiniPlayer : Border
             {
                 LibVLCSharp.Shared.Core.Initialize();
                 var v = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--avcodec-hw=any", "--no-spdif");
+                // Shown by that name in Windows' volume mixer, rather than as "VLC media player".
+                v.SetUserAgent(AdultZone.Core.Config.AppName, AdultZone.Core.Config.AppName + "/" + AdultZone.Core.Config.AppVersion);
                 return (v, new VlcMediaPlayer(v) { EnableHardwareDecoding = true, EnableKeyInput = false, EnableMouseInput = false, Mute = true });
             });
             _mp.Playing += (_, _) => Dispatcher.BeginInvoke(() => _playFace.Content = Glyphs.Pause());

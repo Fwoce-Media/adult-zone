@@ -124,7 +124,7 @@ public static class PictureTools
             {
                 var address = url;
                 var art = new Border { Width = wide ? 290 : 170, Height = wide ? 163 : 235, Background = Theme.Ink, CornerRadius = new CornerRadius(8), ClipToBounds = true };
-                Ui.Whole(art, new[] { address }, 520);
+                Ui.Whole(art, new[] { address }, 520, fitShape: true);
                 var frame = new Border { BorderBrush = Theme.LineSoft, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Child = art };
                 var b = Ui.Bare(frame, () => { chosen = address; w.Close(); });
                 b.Cursor = Cursors.Hand;

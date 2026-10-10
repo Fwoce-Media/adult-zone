@@ -618,6 +618,19 @@ public static class Pages
         return Ui.Page(stack);
     }
 
+    /// <summary>A picture file's width over its height, read from its header; 0 when it cannot be read.</summary>
+    static double PictureShape(string file)
+    {
+        try
+        {
+            using var stream = File.OpenRead(file);
+            var frame = System.Windows.Media.Imaging.BitmapFrame.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                System.Windows.Media.Imaging.BitmapCacheOption.None);
+            return frame.PixelHeight > 0 ? (double)frame.PixelWidth / frame.PixelHeight : 0;
+        }
+        catch { return 0; }
+    }
+
     // -------------------------------------------------------------------- actor
     static async Task<FrameworkElement> Actor(MainWindow win, Location where)
     {
@@ -641,7 +654,14 @@ public static class Pages
                 StartPoint = new Point(0, 0), EndPoint = new Point(1, 0),
                 GradientStops = { new GradientStop(Colors.Transparent, 0), new GradientStop(Color.FromArgb(0xA6, 0, 0, 0), 0.42), new GradientStop(Colors.Black, 1) },
             };
-            head.SizeChanged += (_, _) => art.Width = Math.Min(head.ActualWidth * 0.46, 760);
+            // A wide picture fills the right-hand side; an upright or square one keeps its own shape,
+            // as wide as it is at the heading's height, so it is not cropped to a narrow band.
+            var shape = PictureShape(banner);
+            head.SizeChanged += (_, _) =>
+            {
+                var room = Math.Min(head.ActualWidth * 0.46, 760);
+                art.Width = shape is > 0 and < 1.6 ? Math.Min(room, Math.Max(head.ActualHeight * shape * 1.15, 260)) : room;
+            };
             var wrap = new Grid();
             wrap.Children.Add(art);
             wrap.Children.Add(new Border

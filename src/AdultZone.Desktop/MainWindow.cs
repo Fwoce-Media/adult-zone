@@ -756,6 +756,7 @@ public sealed class MainWindow : Window
     public void Navigate(Location where)
     {
         CloseSuggestions();
+        where = Recall(where);
         if (_trail.Count > 0 && _trail[^1].Where == where)
         {
             Refresh();
@@ -770,8 +771,30 @@ public sealed class MainWindow : Window
     /// <summary>Swaps the current place for another without adding a step to Back.</summary>
     public void Replace(Location where)
     {
+        Remember(where);
         if (_trail.Count > 0) _trail[^1] = (where, 0);
         else _trail.Add((where, 0));
+    }
+
+    // ------------------------------------------------- remembered choices
+    // Each tab keeps the sort, quality and gender last picked on it, across restarts.
+    static string RememberKey(string kind, string what) => $"remember.{what}.{kind}";
+
+    static void Remember(Location where)
+    {
+        if (where.Query.Length > 0) return;
+        AdultZone.Core.Data.Db.SetSetting(RememberKey(where.Kind, "sort"), where.Sort);
+        if (where.Kind is "videos" or "movies") AdultZone.Core.Data.Db.SetSetting(RememberKey(where.Kind, "quality"), where.Quality);
+        if (where.Kind == "stars") AdultZone.Core.Data.Db.SetSetting(RememberKey(where.Kind, "gender"), where.Tag);
+    }
+
+    static Location Recall(Location where)
+    {
+        if (where.Query.Length > 0) return where;
+        if (where.Sort.Length == 0) where = where with { Sort = AdultZone.Core.Data.Db.Setting(RememberKey(where.Kind, "sort")) };
+        if (where.Kind is "videos" or "movies" && where.Quality.Length == 0) where = where with { Quality = AdultZone.Core.Data.Db.Setting(RememberKey(where.Kind, "quality")) };
+        if (where.Kind == "stars" && where.Tag.Length == 0) where = where with { Tag = AdultZone.Core.Data.Db.Setting(RememberKey(where.Kind, "gender")) };
+        return where;
     }
 
     public void Refresh(bool keepScroll = false)
